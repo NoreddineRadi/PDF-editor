@@ -10,6 +10,7 @@ deploy_to_vps:
 
   script:
     - |
+      echo "$VPS_USER"
       sshpass -p "$VPS_PASSWORD" ssh \
         -o StrictHostKeyChecking=no \
         "$VPS_USER" << 'EOF'
