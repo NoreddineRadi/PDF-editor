@@ -10,7 +10,11 @@ deploy_to_vps:
 
   script:
     - |
-      echo "$VPS_USER"
+      if [ -z "$VPS_USER" ]; then
+        echo "ERREUR: VPS_USER est vide"
+        exit 1
+      fi
+      echo "VPS_USER est défini"
       sshpass -p "$VPS_PASSWORD" ssh \
         -o StrictHostKeyChecking=no \
         "$VPS_USER" << 'EOF'
