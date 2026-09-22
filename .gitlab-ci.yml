@@ -10,11 +10,6 @@ deploy_to_vps:
 
   script:
     - |
-      if [ -z "$VPS_USER" ]; then
-        echo "ERREUR: VPS_USER est vide"
-        exit 1
-      fi
-      echo "VPS_USER est défini"
       sshpass -p "$VPS_PASSWORD" ssh \
         -o StrictHostKeyChecking=no \
         "$VPS_USER" << 'EOF'
@@ -28,7 +23,7 @@ deploy_to_vps:
 
       yarn
 
-      pm2 start yarn --name "pdf-editor" -- start
+      pm2 start yarn --name "pdf-editor" -- dev
 
       EOF
   only:
