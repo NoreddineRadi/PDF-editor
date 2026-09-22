@@ -1,0 +1,30 @@
+stages:
+  - deploy
+
+deploy_to_vps:
+  stage: deploy
+  image: alpine:latest
+
+  before_script:
+    - apk add --no-cache openssh sshpass git
+
+  script:
+    - |
+      sshpass -p "$VPS_PASSWORD" ssh \
+        -o StrictHostKeyChecking=no \
+        "$VPS_USER" << 'EOF'
+
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+      cd ~/apps/pdf-editor
+
+      git pull origin main
+
+      yarn
+
+      pm2 start yarn --name "pdf-editor" -- start
+
+      EOF
+  only:
+    - main
