@@ -1,10 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { toRaw } from 'vue';
 
-// Configuration du Worker PDF.js 100% compatible Vite & v4
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
-
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url
+).toString()
 export default {
   /**
    * Charge le document PDF sans conflit de Proxy Vue
