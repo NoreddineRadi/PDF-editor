@@ -24,12 +24,13 @@ deploy:
 
   dependencies:
     - build
+  before_script:
+  - mkdir -p ~/.ssh
+  - VPS_HOST="${VPS_USER#*@}"
+  - ssh-keyscan "$VPS_HOST" >> ~/.ssh/known_hosts
 
   script:
     - apt-get update -y && apt-get install -y sshpass
-    - mkdir -p ~/.ssh
-    - ssh-keyscan "$VPS_USER" >> ~/.ssh/known_hosts
-
     - sshpass -p "$VPS_PASSWORD" scp -r dist/* "$VPS_USER:/root/apps/pdf-editor/"
 
   only:
