@@ -31,7 +31,7 @@ deploy:
 
   script:
     - apt-get update -y && apt-get install -y sshpass
-    - sshpass -p "$VPS_PASSWORD" scp -r dist/* "$VPS_USER:/root/apps/pdf-editor/"
+    - sshpass -p "$VPS_PASSWORD" scp -r dist/* "$VPS_USER:/var/www/pdf-editor/"
 
   only:
     - main
