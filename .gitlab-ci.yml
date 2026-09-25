@@ -4,6 +4,11 @@ stages:
 
 build:
   stage: build
+  image: node:24
+
+  before_script:
+  - corepack enable
+  - yarn --version
 
   script:
     - yarn install --immutable
