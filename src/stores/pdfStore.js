@@ -1,17 +1,17 @@
-import { defineStore } from 'pinia';
-import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument, degrees, rgb } from 'pdf-lib';
+import { defineStore } from "pinia";
+import * as pdfjsLib from "pdfjs-dist";
+import { PDFDocument, degrees, rgb } from "pdf-lib";
 
 // Convertisseur Hex (#RRGGBB) vers RGB (0 à 1) pour pdf-lib
 function hexToPdfRgb(hexColor) {
-  const hex = hexColor.replace('#', '');
+  const hex = hexColor.replace("#", "");
   const r = parseInt(hex.substring(0, 2), 16) / 255 || 0;
   const g = parseInt(hex.substring(2, 4), 16) / 255 || 0;
   const b = parseInt(hex.substring(4, 6), 16) / 255 || 0;
   return rgb(r, g, b);
 }
 
-export const usePdfStore = defineStore('pdf', {
+export const usePdfStore = defineStore("pdf", {
   state: () => ({
     documents: {},
     pagesOrder: [], // Array<{ id, docId, pageIndex, rotation, selected, annotations: [] }>
@@ -20,13 +20,13 @@ export const usePdfStore = defineStore('pdf', {
     isLoading: false,
 
     // Outils d'annotation actifs
-    activeTool: 'select', // 'select' | 'text' | 'draw' | 'highlight'
+    activeTool: "select", // 'select' | 'text' | 'draw' | 'highlight'
     strokeWidth: 3,
     fontSize: 16,
     showSignatureModal: false,
     annotations: [], // Tableau global des annotations
-    activeTool: 'select',
-    annotationColor: '#000000',
+    activeTool: "select",
+    annotationColor: "#000000",
     strokeWidth: 3,
   }),
 
@@ -36,9 +36,9 @@ export const usePdfStore = defineStore('pdf', {
     currentPage: (state) => state.currentPageIndex + 1,
     formattedZoom: (state) => `${Math.round(state.zoomLevel * 100)}%`,
     currentPageData: (state) => state.pagesOrder[state.currentPageIndex] || null,
-    selectedPages: (state) => state.pagesOrder.filter(p => p.selected),
-    selectedCount: (state) => state.pagesOrder.filter(p => p.selected).length,
-    hasSelection: (state) => state.pagesOrder.some(p => p.selected)
+    selectedPages: (state) => state.pagesOrder.filter((p) => p.selected),
+    selectedCount: (state) => state.pagesOrder.filter((p) => p.selected).length,
+    hasSelection: (state) => state.pagesOrder.some((p) => p.selected),
   },
 
   actions: {
@@ -52,7 +52,7 @@ export const usePdfStore = defineStore('pdf', {
           const bufferCopy = arrayBuffer.slice(0);
           const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
           const docId = `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-          
+
           this.documents[docId] = { id: docId, name: file.name, pdfJsDoc, arrayBuffer: bufferCopy };
 
           for (let i = 0; i < pdfJsDoc.numPages; i++) {
@@ -62,7 +62,7 @@ export const usePdfStore = defineStore('pdf', {
               pageIndex: i,
               rotation: 0,
               selected: false,
-              annotations: [] // Tableau pour stocker les annotations de la page
+              annotations: [], // Tableau pour stocker les annotations de la page
             });
           }
         }
@@ -91,7 +91,9 @@ export const usePdfStore = defineStore('pdf', {
         this.currentPageIndex = pageNumber - 1;
       }
     },
-    rotatePage(index) { if (this.pagesOrder[index]) this.pagesOrder[index].rotation = (this.pagesOrder[index].rotation + 90) % 360; },
+    rotatePage(index) {
+      if (this.pagesOrder[index]) this.pagesOrder[index].rotation = (this.pagesOrder[index].rotation + 90) % 360;
+    },
     deletePage(index) {
       if (index >= 0 && index < this.pagesOrder.length) {
         this.pagesOrder.splice(index, 1);
@@ -100,11 +102,22 @@ export const usePdfStore = defineStore('pdf', {
         }
       }
     },
-    togglePageSelection(index) { if (this.pagesOrder[index]) this.pagesOrder[index].selected = !this.pagesOrder[index].selected; },
-    selectAllPages(selectAll = true) { this.pagesOrder.forEach(p => p.selected = selectAll); },
-    reorderPages(newOrder) { this.pagesOrder = newOrder; },
-    clearAll() { this.documents = {}; this.pagesOrder = []; this.currentPageIndex = 0; },
+    togglePageSelection(index) {
+      if (this.pagesOrder[index]) this.pagesOrder[index].selected = !this.pagesOrder[index].selected;
+    },
+    selectAllPages(selectAll = true) {
+      this.pagesOrder.forEach((p) => (p.selected = selectAll));
+    },
+    reorderPages(newOrder) {
+      this.pagesOrder = newOrder;
+    },
+    clearAll() {
+      this.documents = {};
+      this.pagesOrder = [];
+      this.currentPageIndex = 0;
+    },
     async exportPdf(onlySelected = false) {
+      console.log("Export PDF: onlySelected =", onlySelected);
       if (!this.hasDocument) return;
       const pagesToExport = onlySelected ? this.selectedPages : this.pagesOrder;
       if (pagesToExport.length === 0) return;
@@ -130,44 +143,65 @@ export const usePdfStore = defineStore('pdf', {
 
           const { width: pageW, height: pageH } = copiedPage.getSize();
 
-          // Incrustation des annotations de la page
-          if (item.annotations && item.annotations.length > 0) {
-            for (const ann of item.annotations) {
-              if (ann.type === 'text') {
-                copiedPage.drawText(ann.text, {
-                  x: ann.x * pageW,
-                  y: pageH - (ann.y * pageH) - (ann.fontSize || 16),
-                  size: ann.fontSize || 16,
-                  color: hexToPdfRgb(ann.color || '#000000')
-                });
-              } 
-              else if (ann.type === 'draw' || ann.type === 'highlight') {
-                const points = ann.points;
-                const strokeColor = hexToPdfRgb(ann.color);
-                const opacity = ann.type === 'highlight' ? 0.35 : 1.0;
-                const thickness = ann.type === 'highlight' ? (ann.width || 12) : (ann.width || 3);
+          // 🔍 SÉCURITÉ : On cherche les annotations dans item.annotations,
+          // ou on les récupère depuis votre store si elles sont stockées ailleurs (ex: this.allAnnotations)
+          const pageAnnotations = item.annotations || [];
+          console.log(`Page ${item.pageIndex} - Nombre d'annotations à incruster :`, pageAnnotations.length);
 
-                for (let i = 0; i < points.length - 1; i++) {
-                  copiedPage.drawLine({
-                    start: { x: points[i].x * pageW, y: pageH - (points[i].y * pageH) },
-                    end: { x: points[i + 1].x * pageW, y: pageH - (points[i + 1].y * pageH) },
-                    thickness: thickness,
-                    color: strokeColor,
-                    opacity: opacity
-                  });
+          if (pageAnnotations.length > 0) {
+            for (const ann of pageAnnotations) {
+              console.log("🔍 DÉTAIL DE L'ANNOTATION :", ann);
+              if (ann.type === "text") {
+                const finalX = (ann.x / 100) * pageW;
+                const finalY = pageH - (ann.y / 100) * pageH - (ann.fontSize || 16);
+
+                copiedPage.drawText(ann.text, {
+                  x: finalX,
+                  y: finalY,
+                  size: ann.fontSize || 16,
+                  color: hexToPdfRgb(ann.color || "#000000"),
+                });
+              } else if (ann.type === "drawing" || ann.type === "highlight") {
+                const points = ann.points;
+                const strokeColor = hexToPdfRgb(ann.color || "#000000");
+                const opacity = ann.type === "highlight" ? 0.35 : 1.0;
+
+                // Utilisation de strokeWidth ou width selon votre objet
+                const thickness = ann.strokeWidth || ann.width || (ann.type === "highlight" ? 12 : 3);
+
+                if (points && points.length > 1) {
+                  for (let i = 0; i < points.length - 1; i++) {
+                    // ⚠️ Note : Comme ce sont des pixels bruts du canvas, on convertit Y par rapport à la hauteur du PDF
+                    // (Si vos points viennent du zoom 1:1 du canvas, assurez-vous qu'ils correspondent aux dimensions du PDF d'origine)
+                    copiedPage.drawLine({
+                      start: {
+                        x: points[i].x,
+                        y: pageH - points[i].y,
+                      },
+                      end: {
+                        x: points[i + 1].x,
+                        y: pageH - points[i + 1].y,
+                      },
+                      thickness: thickness,
+                      color: strokeColor,
+                      opacity: opacity,
+                    });
+                  }
                 }
-              } 
-              else if (ann.type === 'signature') {
-                const imgBytes = await fetch(ann.dataUrl).then(res => res.arrayBuffer());
+              } else if (ann.type === "signature" && ann.dataUrl) {
+                const imgBytes = await fetch(ann.dataUrl).then((res) => res.arrayBuffer());
                 const embeddedImg = await outputPdf.embedPng(imgBytes);
                 const sigW = (ann.w || 0.25) * pageW;
                 const sigH = (ann.h || 0.12) * pageH;
 
+                const finalX = (ann.x / 100) * pageW;
+                const finalY = pageH - (ann.y / 100) * pageH - sigH;
+
                 copiedPage.drawImage(embeddedImg, {
-                  x: ann.x * pageW,
-                  y: pageH - (ann.y * pageH) - sigH,
+                  x: finalX,
+                  y: finalY,
                   width: sigW,
-                  height: sigH
+                  height: sigH,
                 });
               }
             }
@@ -177,16 +211,17 @@ export const usePdfStore = defineStore('pdf', {
         }
 
         const pdfBytes = await outputPdf.save();
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
 
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
         link.download = `pdf_annotated_${Date.now()}.pdf`;
         link.click();
         URL.revokeObjectURL(url);
       } catch (err) {
-        console.error("Erreur lors de l'exportation du PDF :", err);
+        console.error("💥 ERREUR LORS DE L'EXPORTATION DU PDF :", err);
+        alert("Erreur lors de l'exportation : " + err.message);
       } finally {
         this.isLoading = false;
       }
@@ -198,28 +233,26 @@ export const usePdfStore = defineStore('pdf', {
         }
         this.currentPageData.annotations.push({
           id: `ann_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          ...annotation
+          ...annotation,
         });
       }
     },
     updateAnnotation(updatedAnno) {
       if (!this.currentPageData?.annotations) return;
-      const index = this.currentPageData.annotations.findIndex(a => a.id === updatedAnno.id);
+      const index = this.currentPageData.annotations.findIndex((a) => a.id === updatedAnno.id);
       if (index !== -1) {
         this.currentPageData.annotations[index] = { ...updatedAnno };
       }
     },
     removeAnnotation(id) {
       if (!this.currentPageData?.annotations) return;
-      this.currentPageData.annotations = this.currentPageData.annotations.filter(
-        a => a.id !== id
-      );
+      this.currentPageData.annotations = this.currentPageData.annotations.filter((a) => a.id !== id);
     },
     setAnnotationColor(color) {
       this.annotationColor = color;
     },
     setStrokeWidth(width) {
-      console.log('ststrocwidth')
+      console.log("ststrocwidth");
       this.strokeWidth = width;
     },
     setZoomLevel(zoom) {
@@ -230,7 +263,6 @@ export const usePdfStore = defineStore('pdf', {
     },
     zoomOut() {
       this.setZoomLevel(Math.max(0.4, this.zoomLevel - 0.15));
-    }
+    },
   },
-  
 });
