@@ -62,27 +62,48 @@ export default {
   },
   watch: {
     'pageItem.rotation': 'renderThumbnail',
-    documents: { deep: true, handler: 'renderThumbnail' }
+    'pageItem.docId': 'renderThumbnail',
+    'pageItem.pageIndex': 'renderThumbnail'
   },
   mounted() {
     this.renderThumbnail();
   },
+  beforeUnmount() {
+    this.renderToken = null;
+    this.cancelRender();
+  },
   methods: {
+    cancelRender() {
+      if (this.renderTask) {
+        try { this.renderTask.cancel(); } catch (e) { /* déjà terminé */ }
+        this.renderTask = null;
+      }
+    },
+
     async renderThumbnail() {
       const docObj = this.documents[this.pageItem.docId];
       if (!docObj || !this.$refs.thumbCanvas) return;
 
+      // pdf.js refuse deux rendus simultanés sur un même canvas : on annule le précédent
+      const token = Symbol('thumb');
+      this.renderToken = token;
+      this.cancelRender();
+
       try {
         const pageNumber = this.pageItem.pageIndex + 1;
         const page = await pdfReaderService.getPage(docObj.pdfJsDoc, pageNumber);
-        
-        pdfReaderService.renderPage(
+        if (this.renderToken !== token || !this.$refs.thumbCanvas) return;
+
+        const task = pdfReaderService.renderPage(
           page,
           this.$refs.thumbCanvas,
           0.18,
           this.pageItem.rotation
         );
+        this.renderTask = task;
+        await task.promise;
       } catch (err) {
+        if (err?.name === 'RenderingCancelledException' || err?.message?.includes('cancelled')) return;
         console.error('Erreur rendu vignette :', err);
       }
     }

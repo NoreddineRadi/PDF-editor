@@ -24,11 +24,7 @@
     </div>
 
     <!-- Zone de Rendu Document -->
-    <div
-      v-show="hasDocument && !isLoading"
-      class="pdf-viewer-container"
-      :style="{ width: viewportWidth + 'px', height: viewportHeight + 'px', position: 'relative' }"
-    >
+    <div v-show="hasDocument && !isLoading" class="pdf-viewer-container">
       <div class="pdf-viewport shadow-6">
         <canvas ref="pdfCanvas"></canvas>
         <AnnotationLayer :width="viewportWidth" :height="viewportHeight" />
@@ -58,14 +54,19 @@ export default {
       activeRenderId: null,
       isDraggingOver: false,
       renderTimeout: null, // Timer pour le debounce du zoom
+      viewportWidth: 0, // Taille (px CSS) de la page affichée, transmise à la couche d'annotations
+      viewportHeight: 0,
     };
   },
   computed: {
     ...mapState(usePdfStore, ["documents", "currentPageData", "zoomLevel", "hasDocument", "isLoading"]),
   },
   watch: {
-    "currentPageData.pageIndex"() {
-      // Rendu immédiat lors du changement de page (0ms)
+    // Changement de page affichée (id unique : pageIndex seul n'est pas fiable avec plusieurs PDF)
+    "currentPageData.id"() {
+      this.triggerRender(0);
+    },
+    "currentPageData.rotation"() {
       this.triggerRender(0);
     },
     zoomLevel() {
@@ -160,6 +161,12 @@ export default {
         if (this.activeRenderId !== renderId) return;
 
         const canvas = this.$refs.pdfCanvas;
+        if (!canvas) return;
+
+        // Taille de la page affichée : mise à jour avant le rendu pour que la couche d'annotations suive
+        const size = pdfReaderService.getViewportSize(page, this.zoomLevel, this.currentPageData.rotation);
+        this.viewportWidth = size.width;
+        this.viewportHeight = size.height;
 
         // 2. Transmettre le rendu à PDF.js
         const renderTask = pdfReaderService.renderPage(page, canvas, this.zoomLevel, this.currentPageData.rotation);
@@ -201,16 +208,17 @@ export default {
 <style scoped>
 .pdf-viewer-stage {
   flex: 1;
+  min-width: 0;
   background-color: #0f172a;
   display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: auto;
   position: relative;
   height: 100%;
 }
 
+/* margin:auto centre sans rogner le côté gauche/haut quand la page dépasse (contrairement à justify-content:center) */
 .state-container {
+  margin: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -223,6 +231,7 @@ export default {
 }
 
 .dropzone-container {
+  margin: auto;
   width: 100%;
   max-width: 520px;
   padding: 2rem;
@@ -279,15 +288,10 @@ export default {
 }
 
 .pdf-viewer-container {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  overflow: auto;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex: none;
+  margin: auto;
   padding: 1.5rem;
+  position: relative;
 }
 
 .pdf-viewport {

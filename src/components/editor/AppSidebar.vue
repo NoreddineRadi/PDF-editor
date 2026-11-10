@@ -88,7 +88,8 @@ export default {
   display: flex;
   flex-direction: column;
 }
-.app-sidebar.collapsed { width: 48px; }
+/* min-width doit aussi changer, sinon la barre ne se replie jamais */
+.app-sidebar.collapsed { width: 48px; min-width: 48px; overflow: hidden; }
 
 .sidebar-header {
   height: 48px;
@@ -96,13 +97,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
 }
 
 .sidebar-title {
   font-weight: 700;
   font-size: 0.85rem;
-  color: #475569;
+  color: #cbd5e1;
   text-transform: uppercase;
 }
 
@@ -110,8 +112,9 @@ export default {
   display: flex;
   justify-content: space-between;
   padding: 6px 12px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
 }
 
 .tool-btn {
