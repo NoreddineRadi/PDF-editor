@@ -30,13 +30,11 @@ jobs:
         with:
           name: dist-files
           path: dist/
-          retention-days: 1 # Le minimum sur GitHub est 1 jour
+          retention-days: 1
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    container:
-      image: alpine:3.20
 
     steps:
       - name: Download build artifacts
@@ -45,17 +43,13 @@ jobs:
           name: dist-files
           path: dist/
 
-      - name: Install SSH, sshpass and rsync
-        run: apk add --no-cache openssh-client sshpass rsync
-
-      - name: Deploy via rsync with password
+      - name: Install sshpass and deploy via scp
         env:
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-          SSHPASS: ${{ secrets.VPS_PASSWORD }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          sshpass -e rsync -az -e "ssh -p 2222" --delete dist/ "$VPS_USER:/var/www/pdf-editor/"
-
+          VPS_HOST="${VPS_USER#*@}"
+          ssh-keyscan "$VPS_HOST" >> ~/.ssh/known_hosts
+          sudo apt-get update -y && sudo apt-get install -y sshpass
+          sshpass -p "$VPS_PASSWORD" scp -r dist/* "$VPS_USER:/var/www/pdf-editor/"
