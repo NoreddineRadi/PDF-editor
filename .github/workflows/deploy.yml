@@ -51,7 +51,7 @@ jobs:
       - name: Deploy via rsync with password
         env:
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           mkdir -p ~/.ssh
