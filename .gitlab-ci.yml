@@ -1,3 +1,9 @@
+# Variables CI/CD à définir (Settings > CI/CD > Variables, "Protected" + "Masked" si possible) :
+#   VITE_PRIMEVUE_LICENCE : licence PrimeVue (n'est plus dans le dépôt)
+#   VPS_USER              : cible SSH au format utilisateur@hôte
+#   SSH_PRIVATE_KEY       : clé privée de déploiement (type "Variable")
+#   SSH_KNOWN_HOSTS       : sortie de `ssh-keyscan <hôte>` vérifiée une fois à la main (empreinte épinglée)
+
 stages:
   - build
   - deploy
@@ -7,8 +13,8 @@ build:
   image: node:24
 
   before_script:
-  - corepack enable
-  - yarn --version
+    - corepack enable
+    - yarn --version
 
   script:
     - yarn install --immutable
@@ -21,17 +27,22 @@ build:
 
 deploy:
   stage: deploy
+  image: alpine:3.20
 
   dependencies:
     - build
+
   before_script:
-  - mkdir -p ~/.ssh
-  - VPS_HOST="${VPS_USER#*@}"
-  - ssh-keyscan "$VPS_HOST" >> ~/.ssh/known_hosts
+    - apk add --no-cache openssh-client rsync
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - eval "$(ssh-agent -s)"
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
 
   script:
-    - apt-get update -y && apt-get install -y sshpass
-    - sshpass -p "$VPS_PASSWORD" scp -r dist/* "$VPS_USER:/var/www/pdf-editor/"
+    # --delete supprime les anciens fichiers hashés devenus inutiles
+    - rsync -az --delete dist/ "$VPS_USER:/var/www/pdf-editor/"
 
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

@@ -7,6 +7,9 @@ dist/
 .pnp.cjs
 .pnp.loader.mjs
 *.local
+.env
+.env.*
+!.env.example
 build*.txt
 install-log.txt
 npm-debug.log*

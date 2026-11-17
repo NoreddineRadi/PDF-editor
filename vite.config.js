@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { fileURLToPath, URL } from 'node:url'
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   plugins: [vue()],
@@ -19,14 +19,21 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('pdf-lib')) return 'pdf-lib'
-            if (id.includes('pdfjs-dist') || id.includes('pdf.worker')) return 'pdfjs'
-            if (id.includes('primevue') || id.includes('primeicons')) return 'primevue'
-            if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vue-vendor'
-            return 'vendor'
+            if (id.includes('pdf-lib')) return 'pdf-lib';
+            if (id.includes('pdfjs-dist') || id.includes('pdf.worker'))
+              return 'pdfjs';
+            if (id.includes('primevue') || id.includes('primeicons'))
+              return 'primevue';
+            if (
+              id.includes('vue') ||
+              id.includes('pinia') ||
+              id.includes('vue-router')
+            )
+              return 'vue-vendor';
+            return 'vendor';
           }
         },
       },
     },
   },
-})
+});
