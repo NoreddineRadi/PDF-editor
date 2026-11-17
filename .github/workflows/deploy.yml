@@ -57,5 +57,5 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          sshpass -e rsync -az --delete dist/ "$VPS_USER:/var/www/pdf-editor/"
+          sshpass -e rsync -az -e "ssh -p 2222" --delete dist/ "$VPS_USER:/var/www/pdf-editor/"
 
