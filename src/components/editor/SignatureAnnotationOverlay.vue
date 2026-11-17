@@ -1,5 +1,5 @@
 <template>
-  <div 
+  <div
     class="signature-annotation-box"
     :class="{ 'is-selected': isSelected }"
     :style="boxStyle"
@@ -15,8 +15,8 @@
     <img :src="annotation.dataUrl" class="signature-image" draggable="false" />
 
     <!-- Poignée de redimensionnement (Coin bas-droit) -->
-    <div 
-      v-if="isSelected" 
+    <div
+      v-if="isSelected"
       class="resize-handle bottom-right"
       @pointerdown.stop="startResize"
     ></div>
@@ -46,17 +46,13 @@ export default {
     };
   },
   computed: {
+    // Pas de minimum en pixels : la boîte reste proportionnelle à la page (export identique à l'écran)
     boxStyle() {
-      const w = Math.max((this.localW / 100) * this.pageWidth, 80);
-      const h = Math.max((this.localH / 100) * this.pageHeight, 30);
-      const left = (this.localX / 100) * this.pageWidth;
-      const top = (this.localY / 100) * this.pageHeight;
-
       return {
-        left: `${left}px`,
-        top: `${top}px`,
-        width: `${w}px`,
-        height: `${h}px`
+        left: `${(this.localX / 100) * this.pageWidth}px`,
+        top: `${(this.localY / 100) * this.pageHeight}px`,
+        width: `${(this.localW / 100) * this.pageWidth}px`,
+        height: `${(this.localH / 100) * this.pageHeight}px`
       };
     }
   },
@@ -72,6 +68,12 @@ export default {
         }
       }
     }
+  },
+  beforeUnmount() {
+    window.removeEventListener('pointermove', this.onDrag);
+    window.removeEventListener('pointerup', this.stopDrag);
+    window.removeEventListener('pointermove', this.onResize);
+    window.removeEventListener('pointerup', this.stopResize);
   },
   methods: {
     selectSelf() {
@@ -104,10 +106,10 @@ export default {
         window.removeEventListener('pointermove', this.onDrag);
         window.removeEventListener('pointerup', this.stopDrag);
 
-        this.$emit('update', { 
-          ...this.annotation, 
-          x: this.localX, 
-          y: this.localY 
+        this.$emit('update', {
+          ...this.annotation,
+          x: this.localX,
+          y: this.localY
         });
       }
     },
@@ -135,10 +137,10 @@ export default {
         window.removeEventListener('pointermove', this.onResize);
         window.removeEventListener('pointerup', this.stopResize);
 
-        this.$emit('update', { 
-          ...this.annotation, 
-          width: this.localW, 
-          height: this.localH 
+        this.$emit('update', {
+          ...this.annotation,
+          width: this.localW,
+          height: this.localH
         });
       }
     }

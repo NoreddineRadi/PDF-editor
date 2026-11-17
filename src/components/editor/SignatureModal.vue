@@ -1,8 +1,8 @@
 <template>
   <div v-if="visible" class="modal-overlay" @click.self="close">
-    <div class="modal-card shadow-8">
+    <div class="modal-card">
       <div class="modal-header">
-        <div class="title flex align-items-center gap-2">
+        <div class="title">
           <Pencil size="18" />
           <span>Créer votre signature manuscrite</span>
         </div>
@@ -13,10 +13,12 @@
 
       <div class="modal-body">
         <div class="pad-container">
-          <canvas 
-            ref="sigCanvas" 
-            width="450" 
-            height="180" 
+          <!-- Résolution interne x2 pour une signature nette ; l'affichage est en CSS -->
+          <canvas
+            ref="sigCanvas"
+            class="sig-canvas"
+            width="900"
+            height="360"
             @mousedown="startDrawing"
             @mousemove="draw"
             @mouseup="stopDrawing"
@@ -29,16 +31,16 @@
         </div>
       </div>
 
-      <div class="modal-footer flex justify-content-between align-items-center">
-        <Button class="p-button-text p-button-secondary p-button-sm flex align-items-center gap-2" @click="clearPad">
+      <div class="modal-footer">
+        <Button class="p-button-text p-button-secondary p-button-sm btn-inline" @click="clearPad">
           <Refresh size="14" />
           <span>Effacer</span>
         </Button>
 
-        <div class="flex gap-2">
+        <div class="footer-actions">
           <Button label="Annuler" class="p-button-text p-button-sm" @click="close" />
-          <Button 
-            class="p-button-primary p-button-sm flex align-items-center gap-2" 
+          <Button
+            class="p-button-primary p-button-sm btn-inline"
             :disabled="isEmpty"
             @click="saveSignature"
           >
@@ -87,23 +89,32 @@ export default {
       const canvas = this.$refs.sigCanvas;
       this.ctx.clearRect(0, 0, canvas.width, canvas.height);
       this.ctx.strokeStyle = '#0f172a';
-      this.ctx.lineWidth = 2.5;
+      this.ctx.lineWidth = 5;
       this.ctx.lineCap = 'round';
       this.ctx.lineJoin = 'round';
       this.isEmpty = true;
     },
+    // Tient compte du rapport entre la taille CSS et la résolution interne du canvas
     getPos(e) {
-      const rect = this.$refs.sigCanvas.getBoundingClientRect();
+      const canvas = this.$refs.sigCanvas;
+      const rect = canvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return { x: clientX - rect.left, y: clientY - rect.top };
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
     },
     startDrawing(e) {
+      if (!this.ctx) return;
       this.isDrawing = true;
       this.isEmpty = false;
       const pos = this.getPos(e);
       this.ctx.beginPath();
       this.ctx.moveTo(pos.x, pos.y);
+      // Un simple clic laisse un point
+      this.ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+      this.ctx.stroke();
     },
     draw(e) {
       if (!this.isDrawing) return;
@@ -114,10 +125,40 @@ export default {
     stopDrawing() {
       this.isDrawing = false;
     },
+    // Recadre l'image sur le tracé : sans cela la signature contient beaucoup de vide transparent
+    trimCanvas(canvas) {
+      const { width, height } = canvas;
+      const data = canvas.getContext('2d').getImageData(0, 0, width, height).data;
+      let minX = width, minY = height, maxX = -1, maxY = -1;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4 + 3] > 0) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return canvas;
+
+      const pad = 6;
+      const sx = Math.max(0, minX - pad);
+      const sy = Math.max(0, minY - pad);
+      const sw = Math.min(width, maxX + pad + 1) - sx;
+      const sh = Math.min(height, maxY + pad + 1) - sy;
+
+      const out = document.createElement('canvas');
+      out.width = sw;
+      out.height = sh;
+      out.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      return out;
+    },
     saveSignature() {
       if (this.isEmpty) return;
-      const dataUrl = this.$refs.sigCanvas.toDataURL('image/png');
-      this.$emit('save', dataUrl);
+      const trimmed = this.trimCanvas(this.$refs.sigCanvas);
+      this.$emit('save', trimmed.toDataURL('image/png'));
       this.close();
     },
     close() {
@@ -145,6 +186,7 @@ export default {
   width: 500px;
   max-width: 90vw;
   overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.35);
 }
 
 .modal-header {
@@ -156,6 +198,12 @@ export default {
   align-items: center;
   font-weight: 700;
   color: #0f172a;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .icon-close-btn {
@@ -180,6 +228,15 @@ export default {
   align-items: center;
 }
 
+.sig-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 2;
+  cursor: crosshair;
+  touch-action: none;
+}
+
 .placeholder-hint {
   position: absolute;
   color: #94a3b8;
@@ -191,5 +248,19 @@ export default {
   padding: 1rem 1.25rem;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 </style>

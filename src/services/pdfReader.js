@@ -4,7 +4,8 @@ import { toRaw } from 'vue';
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.mjs',
   import.meta.url
-).toString()
+).toString();
+
 export default {
   /**
    * Charge le document PDF sans conflit de Proxy Vue
@@ -29,10 +30,20 @@ export default {
   },
 
   /**
-   * Effectue le rendu sur le canvas
+   * Dimensions (px CSS) de la page affichée, rotation incluse
+   */
+  getViewportSize(page, scale = 1.0, rotation = 0) {
+    const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 });
+    return { width: Math.floor(viewport.width), height: Math.floor(viewport.height) };
+  },
+
+  /**
+   * Effectue le rendu sur le canvas.
+   * `rotation` = rotation ajoutée par l'utilisateur ; elle s'ajoute à la rotation native de la page
+   * (comme à l'export), sinon l'affichage et le PDF exporté ne concordent pas.
    */
   renderPage(page, canvas, scale = 1.0, rotation = 0) {
-    const viewport = page.getViewport({ scale, rotation });
+    const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 });
     const context = canvas.getContext('2d');
 
     // Dimensions physiques du canvas
@@ -43,9 +54,11 @@ export default {
     canvas.style.width = `${Math.floor(viewport.width)}px`;
     canvas.style.height = `${Math.floor(viewport.height)}px`;
 
+    // pdf.js >= 5 attend `canvas` ; `canvasContext` reste passé pour les versions plus anciennes
     return page.render({
+      canvas,
       canvasContext: context,
-      viewport: viewport
+      viewport
     });
   }
 };

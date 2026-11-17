@@ -24,7 +24,7 @@
         <path
           :d="pointsToSvgPath(anno.points)"
           :stroke="anno.color || '#000000'"
-          :stroke-width="anno.strokeWidth || 3"
+          :stroke-width="(anno.strokeWidth || 3) * zoomLevel"
           :opacity="anno.type === 'highlight' ? 0.35 : 1"
           fill="none"
           stroke-linecap="round"
@@ -270,7 +270,8 @@ export default {
           type: isHighlight ? "highlight" : "drawing",
           points: [...this.currentPath],
           color: isHighlight ? "#FFFF00" : this.annotationColor || "#000000",
-          strokeWidth: isHighlight ? 20 : this.strokeWidth || 3,
+          // Épaisseur stockée en points PDF (indépendante du zoom courant) ; l'affichage la remultiplie par le zoom
+          strokeWidth: (isHighlight ? 20 : this.strokeWidth || 3) / this.zoomLevel,
         };
 
         // Sauvegarde dans le store Pinia

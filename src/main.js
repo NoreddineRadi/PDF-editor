@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import Aura from '@primeuix/themes/aura';
 
 import Tooltip from 'primevue/tooltip';
@@ -13,13 +14,13 @@ const app = createApp(App);
 installPrimeIcons(app);
 app.use(createPinia());
 
-
 app.use(PrimeVue, {
   theme: {
     preset: Aura
   },
   license: import.meta.env.VITE_PRIMEVUE_LICENCE
 });
+app.use(ToastService);
 
 app.directive('tooltip', Tooltip);
 app.mount('#app');

@@ -52,6 +52,9 @@
 </template>
 
 <script>
+import { mapState } from 'pinia';
+import { usePdfStore } from '@/stores/pdfStore';
+
 export default {
   name: 'TextAnnotationOverlay',
   props: {
@@ -95,12 +98,15 @@ export default {
       };
     },
 
+    // fontSize est stocké en points PDF : l'affichage suit le zoom comme le reste de la page
     textStyle() {
       return {
-        fontSize: `${this.annotation.fontSize || 16}px`,
+        fontSize: `${(this.annotation.fontSize || 16) * this.zoomLevel}px`,
         color: this.annotation.color || '#000000'
       };
-    }
+    },
+
+    ...mapState(usePdfStore, ['zoomLevel'])
   },
   watch: {
     annotation: {

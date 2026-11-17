@@ -1,5 +1,8 @@
 <template>
   <div class="app-layout">
+    <!-- Notifications (erreurs d'import / d'export) -->
+    <Toast position="bottom-right" />
+
     <!-- Barre d'outils du haut -->
     <AppToolbar />
 
@@ -12,6 +15,9 @@
 </template>
 
 <script>
+import { mapState } from 'pinia';
+import { usePdfStore } from '@/stores/pdfStore';
+import Toast from 'primevue/toast';
 import AppToolbar from './components/editor/AppToolbar.vue';
 import AppSidebar from './components/editor/AppSidebar.vue';
 import PdfViewer from './components/editor/PdfViewer.vue';
@@ -19,17 +25,37 @@ import PdfViewer from './components/editor/PdfViewer.vue';
 export default {
   name: 'App',
   components: {
+    Toast,
     AppToolbar,
     AppSidebar,
     PdfViewer
-  }, 
-  mounted() {
-    window.addEventListener('wheel', (e) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-    }
-  }, { passive: false });
   },
+  computed: {
+    ...mapState(usePdfStore, ['notice'])
+  },
+  watch: {
+    notice(notice) {
+      if (!notice) return;
+      this.$toast.add({
+        severity: notice.severity,
+        summary: notice.summary,
+        detail: notice.detail,
+        life: 6000
+      });
+    }
+  },
+  mounted() {
+    // Empêche le zoom natif du navigateur (Ctrl + molette) : le zoom est géré par l'application
+    window.addEventListener('wheel', this.preventBrowserZoom, { passive: false });
+  },
+  beforeUnmount() {
+    window.removeEventListener('wheel', this.preventBrowserZoom);
+  },
+  methods: {
+    preventBrowserZoom(e) {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }
+  }
 };
 </script>
 

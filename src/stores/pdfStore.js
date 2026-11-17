@@ -1,14 +1,53 @@
 import { defineStore } from "pinia";
-import * as pdfjsLib from "pdfjs-dist";
-import { PDFDocument, degrees, rgb } from "pdf-lib";
+import { markRaw } from "vue";
+import { PDFDocument, StandardFonts, LineCapStyle, degrees, rgb } from "pdf-lib";
+import pdfReaderService from "@/services/pdfReader";
 
 // Convertisseur Hex (#RRGGBB) vers RGB (0 à 1) pour pdf-lib
 function hexToPdfRgb(hexColor) {
-  const hex = hexColor.replace("#", "");
+  const hex = (hexColor || "#000000").replace("#", "");
   const r = parseInt(hex.substring(0, 2), 16) / 255 || 0;
   const g = parseInt(hex.substring(2, 4), 16) / 255 || 0;
   const b = parseInt(hex.substring(4, 6), 16) / 255 || 0;
   return rgb(r, g, b);
+}
+
+const normalizeAngle = (a) => ((Math.round(a / 90) * 90) % 360 + 360) % 360;
+
+/**
+ * Convertit une position exprimée en fractions (0..1) depuis le coin haut-gauche de la page
+ * AFFICHÉE (rotation comprise) vers l'espace utilisateur PDF (origine en bas à gauche,
+ * avant application de /Rotate). W et H sont les dimensions non pivotées de la page.
+ */
+function viewToUser(fx, fy, W, H, R) {
+  switch (R) {
+    case 90:
+      return { x: fy * W, y: fx * H };
+    case 180:
+      return { x: (1 - fx) * W, y: fy * H };
+    case 270:
+      return { x: (1 - fy) * W, y: (1 - fx) * H };
+    default:
+      return { x: fx * W, y: (1 - fy) * H };
+  }
+}
+
+// Helvetica (WinAnsi) ne sait pas encoder tous les caractères : on remplace ceux qui ne passent pas
+function safeText(font, text) {
+  let out = "";
+  for (const ch of String(text ?? "")) {
+    if (ch === "\n") {
+      out += ch;
+      continue;
+    }
+    try {
+      font.encodeText(ch);
+      out += ch;
+    } catch {
+      out += "?";
+    }
+  }
+  return out;
 }
 
 export const usePdfStore = defineStore("pdf", {
@@ -19,15 +58,11 @@ export const usePdfStore = defineStore("pdf", {
     zoomLevel: 1.0,
     isLoading: false,
 
-    // Outils d'annotation actifs
+    // Outils d'annotation
     activeTool: "select", // 'select' | 'text' | 'draw' | 'highlight'
-    strokeWidth: 3,
-    fontSize: 16,
-    showSignatureModal: false,
-    annotations: [], // Tableau global des annotations
-    activeTool: "select",
     annotationColor: "#000000",
     strokeWidth: 3,
+    fontSize: 16,
   }),
 
   getters: {
@@ -49,11 +84,12 @@ export const usePdfStore = defineStore("pdf", {
       try {
         for (const file of files) {
           const arrayBuffer = await file.arrayBuffer();
-          const bufferCopy = arrayBuffer.slice(0);
-          const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+          // loadDocument travaille sur une copie : arrayBuffer reste intact pour pdf-lib à l'export
+          const pdfJsDoc = await pdfReaderService.loadDocument(arrayBuffer);
           const docId = `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-          this.documents[docId] = { id: docId, name: file.name, pdfJsDoc, arrayBuffer: bufferCopy };
+          // markRaw : l'objet pdf.js ne doit jamais être enveloppé dans un Proxy Vue
+          this.documents[docId] = markRaw({ id: docId, name: file.name, pdfJsDoc, arrayBuffer });
 
           for (let i = 0; i < pdfJsDoc.numPages; i++) {
             this.pagesOrder.push({
@@ -62,12 +98,13 @@ export const usePdfStore = defineStore("pdf", {
               pageIndex: i,
               rotation: 0,
               selected: false,
-              annotations: [], // Tableau pour stocker les annotations de la page
+              annotations: [], // Annotations de la page
             });
           }
         }
       } catch (err) {
         console.error("Erreur lors de l'ajout des fichiers PDF :", err);
+        alert("Impossible de lire ce PDF : " + (err?.message || err));
       } finally {
         this.isLoading = false;
       }
@@ -76,9 +113,11 @@ export const usePdfStore = defineStore("pdf", {
     setTool(tool) {
       this.activeTool = tool;
     },
-
     setAnnotationColor(color) {
       this.annotationColor = color;
+    },
+    setStrokeWidth(width) {
+      this.strokeWidth = width;
     },
     undoLastAnnotation() {
       if (this.currentPageData?.annotations?.length > 0) {
@@ -116,8 +155,8 @@ export const usePdfStore = defineStore("pdf", {
       this.pagesOrder = [];
       this.currentPageIndex = 0;
     },
+
     async exportPdf(onlySelected = false) {
-      console.log("Export PDF: onlySelected =", onlySelected);
       if (!this.hasDocument) return;
       const pagesToExport = onlySelected ? this.selectedPages : this.pagesOrder;
       if (pagesToExport.length === 0) return;
@@ -126,88 +165,103 @@ export const usePdfStore = defineStore("pdf", {
 
       try {
         const outputPdf = await PDFDocument.create();
+        const font = await outputPdf.embedFont(StandardFonts.Helvetica);
         const loadedSourceDocs = {};
-
-        for (const docId in this.documents) {
-          loadedSourceDocs[docId] = await PDFDocument.load(this.documents[docId].arrayBuffer);
-        }
+        const imageCache = new Map();
 
         for (const item of pagesToExport) {
+          if (!loadedSourceDocs[item.docId]) {
+            loadedSourceDocs[item.docId] = await PDFDocument.load(this.documents[item.docId].arrayBuffer);
+          }
           const sourceDoc = loadedSourceDocs[item.docId];
           const [copiedPage] = await outputPdf.copyPages(sourceDoc, [item.pageIndex]);
 
-          if (item.rotation) {
-            const currentRot = copiedPage.getRotation().angle;
-            copiedPage.setRotation(degrees((currentRot + item.rotation) % 360));
-          }
+          const nativeRotation = normalizeAngle(copiedPage.getRotation().angle);
+          const R = normalizeAngle(nativeRotation + (item.rotation || 0));
+          if (R !== nativeRotation) copiedPage.setRotation(degrees(R));
 
-          const { width: pageW, height: pageH } = copiedPage.getSize();
+          const page = outputPdf.addPage(copiedPage);
 
-          // 🔍 SÉCURITÉ : On cherche les annotations dans item.annotations,
-          // ou on les récupère depuis votre store si elles sont stockées ailleurs (ex: this.allAnnotations)
-          const pageAnnotations = item.annotations || [];
-          console.log(`Page ${item.pageIndex} - Nombre d'annotations à incruster :`, pageAnnotations.length);
+          // Dimensions NON pivotées de la page (espace utilisateur) et dimensions affichées
+          const { width: W, height: H } = page.getSize();
+          const vw = R % 180 === 0 ? W : H;
+          const vh = R % 180 === 0 ? H : W;
 
-          if (pageAnnotations.length > 0) {
-            for (const ann of pageAnnotations) {
-              console.log("🔍 DÉTAIL DE L'ANNOTATION :", ann);
-              if (ann.type === "text") {
-                const finalX = (ann.x / 100) * pageW;
-                const finalY = pageH - (ann.y / 100) * pageH - (ann.fontSize || 16);
+          for (const ann of item.annotations || []) {
+            if (ann.type === "text") {
+              if (!ann.text || !ann.text.trim()) continue;
+              const size = ann.fontSize || 16; // en points PDF
+              const boxW = ((ann.width || 25) / 100) * vw;
+              // Ligne de base ≈ haut de la boîte + padding + 1 em
+              const p = viewToUser(
+                (ann.x / 100) + 5 / vw,
+                (ann.y / 100) + (size + 3) / vh,
+                W,
+                H,
+                R
+              );
+              page.drawText(safeText(font, ann.text), {
+                x: p.x,
+                y: p.y,
+                size,
+                font,
+                color: hexToPdfRgb(ann.color),
+                lineHeight: size * 1.3,
+                maxWidth: Math.max(20, boxW - 10),
+                rotate: degrees(R),
+              });
+            } else if (ann.type === "drawing" || ann.type === "highlight") {
+              const points = ann.points;
+              if (!points || points.length < 1) continue;
+              const color = hexToPdfRgb(ann.color);
+              const opacity = ann.type === "highlight" ? 0.35 : 1.0;
+              const thickness = ann.strokeWidth || (ann.type === "highlight" ? 20 : 3);
+              // Les points sont sur une grille normalisée 0..1000
+              const toUser = (pt) => viewToUser(pt.x / 1000, pt.y / 1000, W, H, R);
 
-                copiedPage.drawText(ann.text, {
-                  x: finalX,
-                  y: finalY,
-                  size: ann.fontSize || 16,
-                  color: hexToPdfRgb(ann.color || "#000000"),
-                });
-              } else if (ann.type === "drawing" || ann.type === "highlight") {
-                const points = ann.points;
-                const strokeColor = hexToPdfRgb(ann.color || "#000000");
-                const opacity = ann.type === "highlight" ? 0.35 : 1.0;
-
-                // Utilisation de strokeWidth ou width selon votre objet
-                const thickness = ann.strokeWidth || ann.width || (ann.type === "highlight" ? 12 : 3);
-
-                if (points && points.length > 1) {
-                  for (let i = 0; i < points.length - 1; i++) {
-                    // ⚠️ Note : Comme ce sont des pixels bruts du canvas, on convertit Y par rapport à la hauteur du PDF
-                    // (Si vos points viennent du zoom 1:1 du canvas, assurez-vous qu'ils correspondent aux dimensions du PDF d'origine)
-                    copiedPage.drawLine({
-                      start: {
-                        x: points[i].x,
-                        y: pageH - points[i].y,
-                      },
-                      end: {
-                        x: points[i + 1].x,
-                        y: pageH - points[i + 1].y,
-                      },
-                      thickness: thickness,
-                      color: strokeColor,
-                      opacity: opacity,
-                    });
-                  }
-                }
-              } else if (ann.type === "signature" && ann.dataUrl) {
-                const imgBytes = await fetch(ann.dataUrl).then((res) => res.arrayBuffer());
-                const embeddedImg = await outputPdf.embedPng(imgBytes);
-                const sigW = (ann.w || 0.25) * pageW;
-                const sigH = (ann.h || 0.12) * pageH;
-
-                const finalX = (ann.x / 100) * pageW;
-                const finalY = pageH - (ann.y / 100) * pageH - sigH;
-
-                copiedPage.drawImage(embeddedImg, {
-                  x: finalX,
-                  y: finalY,
-                  width: sigW,
-                  height: sigH,
+              if (points.length === 1) {
+                const a = toUser(points[0]);
+                page.drawLine({ start: a, end: a, thickness, color, opacity, lineCap: LineCapStyle.Round });
+                continue;
+              }
+              for (let i = 0; i < points.length - 1; i++) {
+                page.drawLine({
+                  start: toUser(points[i]),
+                  end: toUser(points[i + 1]),
+                  thickness,
+                  color,
+                  opacity,
+                  lineCap: LineCapStyle.Round,
                 });
               }
+            } else if (ann.type === "signature" && ann.dataUrl) {
+              let img = imageCache.get(ann.dataUrl);
+              if (!img) {
+                const imgBytes = await fetch(ann.dataUrl).then((res) => res.arrayBuffer());
+                img = await outputPdf.embedPng(imgBytes);
+                imageCache.set(ann.dataUrl, img);
+              }
+
+              // Même logique que l'affichage (object-fit: contain, centré dans la boîte)
+              const boxW = ((ann.width || 25) / 100) * vw;
+              const boxH = ((ann.height || 10) / 100) * vh;
+              const ratio = Math.min(boxW / img.width, boxH / img.height);
+              const dw = img.width * ratio;
+              const dh = img.height * ratio;
+              const offX = (boxW - dw) / 2;
+              const offY = (boxH - dh) / 2;
+
+              // Coin bas-gauche visuel de l'image
+              const p = viewToUser((ann.x / 100) + offX / vw, (ann.y / 100) + (offY + dh) / vh, W, H, R);
+              page.drawImage(img, {
+                x: p.x,
+                y: p.y,
+                width: dw,
+                height: dh,
+                rotate: degrees(R),
+              });
             }
           }
-
-          outputPdf.addPage(copiedPage);
         }
 
         const pdfBytes = await outputPdf.save();
@@ -217,15 +271,18 @@ export const usePdfStore = defineStore("pdf", {
         const link = document.createElement("a");
         link.href = url;
         link.download = `pdf_annotated_${Date.now()}.pdf`;
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
       } catch (err) {
-        console.error("💥 ERREUR LORS DE L'EXPORTATION DU PDF :", err);
+        console.error("Erreur lors de l'exportation du PDF :", err);
         alert("Erreur lors de l'exportation : " + err.message);
       } finally {
         this.isLoading = false;
       }
     },
+
     addAnnotationToCurrentPage(annotation) {
       if (this.currentPageData) {
         if (!this.currentPageData.annotations) {
@@ -248,21 +305,15 @@ export const usePdfStore = defineStore("pdf", {
       if (!this.currentPageData?.annotations) return;
       this.currentPageData.annotations = this.currentPageData.annotations.filter((a) => a.id !== id);
     },
-    setAnnotationColor(color) {
-      this.annotationColor = color;
-    },
-    setStrokeWidth(width) {
-      console.log("ststrocwidth");
-      this.strokeWidth = width;
-    },
+
     setZoomLevel(zoom) {
       this.zoomLevel = zoom;
     },
     zoomIn() {
-      this.setZoomLevel(Math.min(3.0, this.zoomLevel + 0.15));
+      this.setZoomLevel(Math.min(3.0, Math.round((this.zoomLevel + 0.15) * 100) / 100));
     },
     zoomOut() {
-      this.setZoomLevel(Math.max(0.4, this.zoomLevel - 0.15));
+      this.setZoomLevel(Math.max(0.4, Math.round((this.zoomLevel - 0.15) * 100) / 100));
     },
   },
 });

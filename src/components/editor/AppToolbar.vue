@@ -90,8 +90,6 @@
           >
             <Pencil size="16" />
           </Button>
-          <div class="color-picker-container" title="Couleur par défaut du texte">
-    </div>
         </div>
 
         <!-- Groupe C : Style & Annulation -->
@@ -184,13 +182,13 @@ export default {
   },
   computed: {
     ...mapState(usePdfStore, [
-      'hasDocument', 'currentPage', 'pageCount', 'zoomLevel',
+      'hasDocument', 'currentPage', 'pageCount',
       'hasSelection', 'selectedCount', 'activeTool', 'annotationColor'
     ])
   },
   methods: {
     ...mapActions(usePdfStore, [
-      'addFiles', 'setPage', 'setZoom', 'exportPdf', 'clearAll',
+      'addFiles', 'setPage', 'exportPdf', 'clearAll',
       'setTool', 'setAnnotationColor', 'undoLastAnnotation', 'addAnnotationToCurrentPage', 'setStrokeWidth'
     ]),
     triggerFileSelect() { this.$refs.fileInput.click(); },
