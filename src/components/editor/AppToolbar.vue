@@ -28,106 +28,177 @@
       </Button>
     </div>
 
-    <!-- 2. BLOC CENTRE : Barre d'outils alignée -->
+    <!-- 2. BLOC CENTRE : outils organisés en groupes -->
     <div v-if="hasDocument" class="header-center">
       <div class="toolbar-scroll-container">
-        
-        <!-- Groupe A : Mode Sélection -->
+
+        <!-- Sélection -->
         <div class="control-group">
-          <Button 
-            class="p-button-text header-icon-btn" 
-            :class="{ 'tool-active': activeTool === 'select' }" 
+          <Button
+            class="p-button-text header-icon-btn"
+            :class="{ 'tool-active': activeTool === 'select' }"
             @click="setTool('select')"
-            v-tooltip.bottom="'Mode Sélection / Navigation'"
+            v-tooltip.bottom="'Sélectionner / déplacer / pivoter (Échap)'"
           >
-            <FolderOpen size="16" />
+            <ToolIcon name="select" />
           </Button>
         </div>
 
-        <!-- Groupe B : Outils d'Annotation -->
+        <!-- Dessiner -->
         <div class="control-group">
-          <Button 
-            class="p-button-text header-icon-btn" 
-            :class="{ 'tool-active': activeTool === 'draw' }" 
+          <Button
+            class="p-button-text header-icon-btn"
+            :class="{ 'tool-active': activeTool === 'draw' }"
             @click="setTool('draw')"
-            v-tooltip.bottom="'Dessin manuscrit'"
+            v-tooltip.bottom="'Crayon'"
           >
-            <Pencil size="16" />
+            <ToolIcon name="pen" />
           </Button>
-          <select 
-            v-if="activeTool === 'draw'" 
-            :value="strokeWidth" 
-            @change="onStrokeWidthChange"
-            class="stroke-select"
-          >
-            <option :value="2">Trait fin (2px)</option>
-            <option :value="4">Moyen (4px)</option>
-            <option :value="8">Épais (8px)</option>
-          </select>
-
-          <Button 
-            class="p-button-text header-icon-btn" 
-            :class="{ 'tool-active': activeTool === 'highlight' }" 
+          <Button
+            class="p-button-text header-icon-btn"
+            :class="{ 'tool-active': activeTool === 'highlight' }"
             @click="setTool('highlight')"
             v-tooltip.bottom="'Surligneur'"
           >
-            <Sparkles size="16" />
+            <ToolIcon name="highlighter" />
           </Button>
+          <Button
+            class="p-button-text header-icon-btn"
+            :class="{ 'tool-active': activeTool === 'eraser' }"
+            @click="setTool('eraser')"
+            v-tooltip.bottom="'Gomme : supprime les éléments ajoutés que vous touchez'"
+          >
+            <ToolIcon name="eraser" />
+          </Button>
+          <Button
+            class="p-button-text header-icon-btn"
+            :class="{ 'tool-active': activeTool === 'mask' }"
+            @click="setTool('mask')"
+            v-tooltip.bottom="'Masquer : recouvre une zone d\'un aplat de la couleur du fond'"
+          >
+            <ToolIcon name="mask" />
+          </Button>
+        </div>
 
-          <Button 
-            class="p-button-text header-icon-btn" 
-            :class="{ 'tool-active': activeTool === 'text' }" 
+        <!-- Insérer -->
+        <div class="control-group">
+          <Button
+            class="p-button-text header-icon-btn"
+            :class="{ 'tool-active': activeTool === 'text' }"
             @click="setTool('text')"
             v-tooltip.bottom="'Ajouter du texte'"
           >
-            <FileEdit size="16" />
+            <ToolIcon name="text" />
           </Button>
-
-          <Button 
-            class="p-button-text header-icon-btn signature-btn" 
+          <Button
+            class="p-button-text header-icon-btn signature-btn"
             @click="openSignatureModal"
             v-tooltip.bottom="'Ajouter une signature manuscrite'"
           >
-            <Pencil size="16" />
+            <ToolIcon name="signature" />
           </Button>
         </div>
 
-        <!-- Groupe C : Style & Annulation -->
-        <div class="control-group">
-          <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur d\'annotation'">
-            <input 
-              type="color" 
-              :value="annotationColor" 
-              @input="e => setAnnotationColor(e.target.value)" 
-              class="color-picker-input"
+        <!-- Style : n'apparaît que lorsque l'outil actif ou l'élément sélectionné en a besoin -->
+        <div v-if="styleContext" class="control-group style-group">
+          <!-- Surligneur -->
+          <template v-if="styleContext === 'highlight'">
+            <button
+              v-for="c in highlightPalette"
+              :key="c"
+              class="swatch"
+              :class="{ active: highlightColorValue.toLowerCase() === c.toLowerCase() }"
+              :style="{ backgroundColor: c }"
+              :title="c"
+              @click="setHighlightColor(c)"
+            ></button>
+            <div class="color-picker-wrapper" v-tooltip.bottom="'Autre couleur'">
+              <input type="color" :value="highlightColorValue" @input="(e) => setHighlightColor(e.target.value)" class="color-picker-input" />
+            </div>
+            <span class="style-sep"></span>
+            <button
+              v-for="p in highlightPresets"
+              :key="p.value"
+              class="preset-btn"
+              :class="{ active: highlightWidthValue === p.value }"
+              :title="p.title"
+              @click="setHighlightWidth(p.value)"
+            >{{ p.label }}</button>
+            <input
+              type="range"
+              min="4"
+              max="60"
+              step="1"
+              class="width-slider"
+              :value="highlightWidthValue"
+              @input="(e) => setHighlightWidth(Number(e.target.value))"
             />
-          </div>
+            <span class="width-label">{{ highlightWidthValue }} px</span>
+          </template>
 
-          <Button 
-            class="p-button-text header-icon-btn" 
-            @click="undoLastAnnotation"
-            v-tooltip.bottom="'Annuler la dernière action'"
+          <!-- Masque -->
+          <template v-else-if="styleContext === 'mask'">
+            <button
+              class="preset-btn"
+              :class="{ active: !selectedAnnotation && maskColor === 'auto' }"
+              title="Reprend la couleur du fond de la page autour de la zone"
+              @click="setMaskColor('auto')"
+            >Auto</button>
+            <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur du masque'">
+              <input type="color" :value="maskColorValue" @input="(e) => setMaskColor(e.target.value)" class="color-picker-input" />
+            </div>
+          </template>
+
+          <!-- Crayon / texte -->
+          <template v-else>
+            <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur'">
+              <input type="color" :value="annotationColor" @input="(e) => setAnnotationColor(e.target.value)" class="color-picker-input" />
+            </div>
+            <select v-if="styleContext === 'draw'" :value="strokeWidth" @change="onStrokeWidthChange" class="stroke-select">
+              <option :value="2">Fin (2px)</option>
+              <option :value="3">Normal (3px)</option>
+              <option :value="4">Moyen (4px)</option>
+              <option :value="8">Épais (8px)</option>
+            </select>
+          </template>
+        </div>
+
+        <!-- Historique -->
+        <div class="control-group">
+          <Button
+            class="p-button-text header-icon-btn"
+            :disabled="!canUndo"
+            @click="undo"
+            v-tooltip.bottom="'Annuler (Ctrl+Z)'"
           >
-            <Undo size="16" />
+            <ToolIcon name="undo" />
+          </Button>
+          <Button
+            class="p-button-text header-icon-btn"
+            :disabled="!canRedo"
+            @click="redo"
+            v-tooltip.bottom="'Rétablir (Ctrl+Y)'"
+          >
+            <ToolIcon name="redo" />
           </Button>
         </div>
 
-        <!-- Groupe D : Navigation -->
+        <!-- Navigation -->
         <div class="control-group">
-          <Button 
-            class="p-button-text header-icon-btn" 
-            :disabled="currentPage <= 1" 
+          <Button
+            class="p-button-text header-icon-btn"
+            :disabled="currentPage <= 1"
             @click="prevPage"
             v-tooltip.bottom="'Page précédente'"
           >
             <ChevronLeft size="16" />
           </Button>
-          
+
           <span class="page-pill">{{ currentPage }} / {{ pageCount }}</span>
-          
-          <Button 
-            class="p-button-text header-icon-btn" 
-            :disabled="currentPage >= pageCount" 
+
+          <Button
+            class="p-button-text header-icon-btn"
+            :disabled="currentPage >= pageCount"
             @click="nextPage"
             v-tooltip.bottom="'Page suivante'"
           >
@@ -172,24 +243,66 @@
 import { mapState, mapActions } from 'pinia';
 import { usePdfStore } from '@/stores/pdfStore';
 import SignatureModal from './SignatureModal.vue';
+import ToolIcon from './ToolIcon.vue';
 import Button from 'primevue/button';
 
 export default {
   name: 'AppToolbar',
-  components: { Button, SignatureModal },
+  components: { Button, SignatureModal, ToolIcon },
   data() {
-    return { showSigModal: false };
+    return {
+      showSigModal: false,
+      highlightPalette: ['#FFFF00', '#7CFC00', '#FF8DC7', '#FFA500', '#4FC3F7'],
+      highlightPresets: [
+        { label: 'S', value: 10, title: 'Fin (10 px)' },
+        { label: 'M', value: 20, title: 'Moyen (20 px)' },
+        { label: 'L', value: 36, title: 'Large (36 px)' }
+      ]
+    };
   },
   computed: {
     ...mapState(usePdfStore, [
       'hasDocument', 'currentPage', 'pageCount',
-      'hasSelection', 'selectedCount', 'activeTool', 'annotationColor'
-    ])
+      'hasSelection', 'selectedCount', 'activeTool', 'annotationColor',
+      'strokeWidth', 'highlightColor', 'highlightWidth', 'maskColor',
+      'selectedAnnotation', 'canUndo', 'canRedo'
+    ]),
+
+    // Quel panneau de réglages afficher ? Dépend de l'outil actif, sinon de l'élément sélectionné.
+    styleContext() {
+      const tool = this.activeTool;
+      if (tool === 'highlight' || tool === 'mask' || tool === 'draw' || tool === 'text') return tool;
+      if (tool === 'eraser') return null;
+      const type = this.selectedAnnotation?.type;
+      if (type === 'highlight') return 'highlight';
+      if (type === 'mask') return 'mask';
+      if (type === 'drawing') return 'draw';
+      if (type === 'text') return 'text';
+      return null;
+    },
+
+    // Valeurs affichées : celles de l'élément sélectionné s'il y en a un, sinon les réglages de l'outil
+    selectedHighlight() {
+      const a = this.selectedAnnotation;
+      return a && a.type === 'highlight' && this.activeTool === 'select' ? a : null;
+    },
+    highlightColorValue() {
+      return this.selectedHighlight ? this.selectedHighlight.color : this.highlightColor;
+    },
+    highlightWidthValue() {
+      return Math.round(this.selectedHighlight ? this.selectedHighlight.strokeWidth : this.highlightWidth);
+    },
+    maskColorValue() {
+      const a = this.selectedAnnotation;
+      if (a && a.type === 'mask' && this.activeTool === 'select') return a.color || '#ffffff';
+      return this.maskColor === 'auto' ? '#ffffff' : this.maskColor;
+    }
   },
   methods: {
     ...mapActions(usePdfStore, [
-      'addFiles', 'setPage', 'exportPdf', 'clearAll',
-      'setTool', 'setAnnotationColor', 'undoLastAnnotation', 'addAnnotationToCurrentPage', 'setStrokeWidth'
+      'addFiles', 'setPage', 'exportPdf', 'clearAll', 'setTool',
+      'setAnnotationColor', 'setStrokeWidth', 'setHighlightColor', 'setHighlightWidth', 'setMaskColor',
+      'undo', 'redo', 'addAnnotationToCurrentPage'
     ]),
     triggerFileSelect() { this.$refs.fileInput.click(); },
     onFileChange(e) {
@@ -200,17 +313,17 @@ export default {
     nextPage() { this.setPage(this.currentPage + 1); },
     openSignatureModal() { this.showSigModal = true; },
     applySignature(dataUrl) {
-      const newSignatureAnno = {
+      // On repasse en sélection pour que la signature soit tout de suite déplaçable / redimensionnable
+      this.setTool('select');
+      this.addAnnotationToCurrentPage({
         type: 'signature',
-        dataUrl: dataUrl,
-        x: 35,    // Position centrale par défaut (35%)
-        y: 40,    // Position centrale par défaut (40%)
-        width: 25, // Largeur 25% de la page
-        height: 10  // Hauteur 10% de la page
-      };
-
-      // Ajoute au store Pinia
-      this.addAnnotationToCurrentPage(newSignatureAnno);
+        dataUrl,
+        x: 35,     // Position centrale par défaut
+        y: 40,
+        width: 25, // 25 % de la largeur de la page
+        height: 10,
+        rotation: 0
+      }, { select: true });
     },
     onStrokeWidthChange(e) {
       this.setStrokeWidth(Number(e.target.value));
@@ -386,6 +499,52 @@ export default {
 
 :deep(.extract-btn) { background-color: #10b981 !important; border: none !important; color: #ffffff !important; }
 :deep(.export-btn) { background-color: #2563eb !important; border: none !important; color: #ffffff !important; }
+
+/* Réglages contextuels (surligneur, masque, crayon) */
+.style-group { gap: 6px; padding: 0 8px; }
+
+.style-sep { width: 1px; height: 18px; background-color: #475569; margin: 0 2px; }
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.swatch:hover { transform: scale(1.12); }
+.swatch.active { border-color: #ffffff; box-shadow: 0 0 0 2px #2563eb; }
+
+.preset-btn {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid #475569;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.preset-btn:hover { background-color: #334155; }
+.preset-btn.active { background-color: #2563eb; border-color: #2563eb; color: #ffffff; }
+
+.width-slider { width: 90px; accent-color: #2563eb; cursor: pointer; }
+.width-label { color: #94a3b8; font-size: 0.75rem; min-width: 38px; }
+
+.stroke-select {
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.75rem;
+}
+
+:deep(.p-button.header-icon-btn:disabled) { opacity: 0.35; }
 
 /* Responsive : Masque le texte des boutons sur petit écran */
 @media (max-width: 1024px) {

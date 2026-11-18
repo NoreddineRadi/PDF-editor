@@ -11,9 +11,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['pdfjs-dist'],
+    esbuildOptions: { target: 'esnext' },
   },
   build: {
-    target: 'es2020',
+    // pdfjs-dist (v4+) utilise le top-level await : 'es2020' fait échouer le build
+    target: 'es2022',
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
