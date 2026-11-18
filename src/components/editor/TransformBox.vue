@@ -63,6 +63,7 @@ export default {
     isSelected: { type: Boolean, default: false },
     dragFromBody: { type: Boolean, default: true }, // false pour le texte : on déplace via la barre flottante
     lockAspect: { type: Boolean, default: false },
+    cornersOnly: { type: Boolean, default: false }, // images : seules les poignées d'angle (les proportions restent justes)
     minWidth: { type: Number, default: 16 },
     minHeight: { type: Number, default: 10 },
     passThrough: { type: Boolean, default: false }, // traits : seule la zone tracée capte la souris tant que non sélectionné
@@ -130,7 +131,7 @@ export default {
     },
 
     handles() {
-      return HANDLES.map((h) => {
+      return HANDLES.filter((h) => !this.cornersOnly || (h.dirX !== 0 && h.dirY !== 0)).map((h) => {
         const ang = (Math.atan2(h.dirY, h.dirX) * 180) / Math.PI + this.geo.rot;
         const idx = ((Math.round(ang / 45) % 8) + 8) % 8;
         return { ...h, cursor: CURSORS[idx % 4] };

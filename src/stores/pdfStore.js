@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { markRaw, toRaw } from 'vue';
 import pdfReaderService from '@/services/pdfReader';
 import { exportPdfBytes, downloadBytes } from '@/services/pdfExporter';
+import { loadImageFile, fitImageBox } from '@/utils/imageHelpers';
 
 const HISTORY_LIMIT = 100;
 const STYLE_KEYS = ['fontSize', 'color', 'strokeWidth'];
@@ -25,44 +26,6 @@ function snapshotPages(pagesOrder) {
   return markRaw(snap);
 }
 
-const normalizeAngle = (a) => (((Math.round(a / 90) * 90) % 360) + 360) % 360;
-
-/**
- * Convertit une position exprimée en fractions (0..1) depuis le coin haut-gauche de la page
- * AFFICHÉE (rotation comprise) vers l'espace utilisateur PDF (origine en bas à gauche,
- * avant application de /Rotate). W et H sont les dimensions non pivotées de la page.
- */
-function viewToUser(fx, fy, W, H, R) {
-  switch (R) {
-    case 90:
-      return { x: fy * W, y: fx * H };
-    case 180:
-      return { x: (1 - fx) * W, y: fy * H };
-    case 270:
-      return { x: (1 - fy) * W, y: (1 - fx) * H };
-    default:
-      return { x: fx * W, y: (1 - fy) * H };
-  }
-}
-
-// Helvetica (WinAnsi) ne sait pas encoder tous les caractères : on remplace ceux qui ne passent pas
-function safeText(font, text) {
-  let out = '';
-  for (const ch of String(text ?? '')) {
-    if (ch === '\n') {
-      out += ch;
-      continue;
-    }
-    try {
-      font.encodeText(ch);
-      out += ch;
-    } catch {
-      out += '?';
-    }
-  }
-  return out;
-}
-
 export const usePdfStore = defineStore('pdf', {
   state: () => ({
     documents: {},
@@ -70,6 +33,11 @@ export const usePdfStore = defineStore('pdf', {
     currentPageIndex: 0,
     zoomLevel: 1.0,
     isLoading: false,
+
+    // Taille (px) de la page affichée : renseignée par PdfViewer, sert à dimensionner les éléments insérés
+    pageViewport: { width: 0, height: 0 },
+    // Message à afficher (toast) : { severity, summary, detail } ; remplacé à chaque notification
+    notice: null,
 
     // Outils
     activeTool: 'select', // 'select' | 'text' | 'draw' | 'highlight' | 'eraser' | 'mask'
@@ -79,7 +47,7 @@ export const usePdfStore = defineStore('pdf', {
     fontSize: 16,
     highlightColor: '#FFFF00',
     highlightWidth: 20, // surligneur : épaisseur en px de page (indépendante du zoom)
-    maskColor: 'auto', // 'auto' = couleur du fond de la page, sinon #RRGGBB
+    maskColor: '#ffffff', // Blanco : blanc par défaut ; 'auto' = couleur du fond de la page ; sinon #RRGGBB
 
     // Historique (annuler / rétablir)
     undoStack: [],
@@ -110,6 +78,32 @@ export const usePdfStore = defineStore('pdf', {
   },
 
   actions: {
+    notify(severity, summary, detail = '') {
+      this.notice = { severity, summary, detail, at: Date.now() };
+    },
+    setPageViewport(width, height) {
+      if (this.pageViewport.width !== width || this.pageViewport.height !== height) {
+        this.pageViewport = { width, height };
+      }
+    },
+
+    /** Insère une image (PNG/JPG) au centre de la page courante, prête à être déplacée / redimensionnée / pivotée. */
+    async addImageFromFile(file) {
+      if (!this.currentPageData) return;
+      try {
+        const img = await loadImageFile(file);
+        const { width: pw, height: ph } = this.pageViewport;
+        const box = fitImageBox(img.width, img.height, pw || 800, ph || 1130);
+        this.setTool('select');
+        this.addAnnotationToCurrentPage(
+          { type: 'image', dataUrl: img.dataUrl, ...box, rotation: 0 },
+          { select: true },
+        );
+      } catch (err) {
+        this.notify('error', 'Image non ajoutée', err?.message || String(err));
+      }
+    },
+
     async addFiles(files) {
       if (!files || files.length === 0) return;
       this.isLoading = true;
@@ -142,7 +136,7 @@ export const usePdfStore = defineStore('pdf', {
         }
       } catch (err) {
         console.error("Erreur lors de l'ajout des fichiers PDF :", err);
-        alert('Impossible de lire ce PDF : ' + (err?.message || err));
+        this.notify('error', 'Import impossible', 'Impossible de lire ce PDF : ' + (err?.message || err));
       } finally {
         this.isLoading = false;
       }
@@ -347,7 +341,7 @@ export const usePdfStore = defineStore('pdf', {
         downloadBytes(bytes, `pdf_annotated_${Date.now()}.pdf`);
       } catch (err) {
         console.error("Erreur lors de l'exportation du PDF :", err);
-        alert("Erreur lors de l'exportation : " + err.message);
+        this.notify('error', 'Export impossible', "Erreur lors de l'exportation : " + (err?.message || err));
       } finally {
         this.isLoading = false;
       }

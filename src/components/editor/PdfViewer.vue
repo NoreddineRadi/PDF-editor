@@ -97,7 +97,7 @@ export default {
     }
   },
   methods: {
-    ...mapActions(usePdfStore, ["addFiles", "setZoomLevel"]),
+    ...mapActions(usePdfStore, ["addFiles", "setZoomLevel", "setPageViewport"]),
 
     openFilePicker() {
       this.$refs.dropzoneFileInput?.click();
@@ -167,6 +167,7 @@ export default {
         const size = pdfReaderService.getViewportSize(page, this.zoomLevel, this.currentPageData.rotation);
         this.viewportWidth = size.width;
         this.viewportHeight = size.height;
+        this.setPageViewport(size.width, size.height);
 
         // 2. Transmettre le rendu à PDF.js
         const renderTask = pdfReaderService.renderPage(page, canvas, this.zoomLevel, this.currentPageData.rotation);

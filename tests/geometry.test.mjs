@@ -4,6 +4,8 @@ import {
   localToView, viewToLocal, viewToUser, hitTest, buildStrokeAnnotation, pointsToPath, normalizeRightAngle,
 } from "../src/utils/annotationGeometry.js";
 import { buildPageOps } from "../src/services/annotationOps.js";
+import { fitImageBox } from "../src/utils/imageHelpers.js";
+import { describeBuild } from "../src/utils/appInfo.js";
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log("  ok  " + name); };
@@ -112,6 +114,35 @@ test("pointsToPath", () => {
 test("normalizeRightAngle", () => {
   assert.equal(normalizeRightAngle(-90), 270);
   assert.equal(normalizeRightAngle(450), 90);
+});
+
+
+test("image pivotée de 90° : coin d'ancrage et angle pdf-lib", () => {
+  const sizes = new Map([["d", { width: 200, height: 100 }]]);
+  const [op] = buildPageOps([{ type: "image", dataUrl: "d", x: 10, y: 20, width: 30, height: 15, rotation: 90 }], { W, H, R: 0 }, sizes);
+  near(op.width, 180); near(op.height, 90);
+  near(op.x, 105); near(op.y, 670); near(op.rotateDeg, -90);
+});
+
+test("image sur page tournée de 90° + rotation de l'image", () => {
+  const sizes = new Map([["d", { width: 100, height: 100 }]]);
+  const [op] = buildPageOps([{ type: "image", dataUrl: "d", x: 0, y: 0, width: 10, height: 10, rotation: 0 }], { W, H, R: 90 }, sizes);
+  near(op.rotateDeg, 90);
+  near(op.width, 60); near(op.height, 60); // boîte 80 x 60 (10 % de la vue 800 x 600) : image carrée ajustée en "contain"
+});
+
+test("fitImageBox : tient dans 40 % de la page, proportions respectées, centrée", () => {
+  const b = fitImageBox(1000, 500, 800, 1130);
+  near(b.width, 40); near(b.height, (160 / 1130) * 100);
+  near(b.x, 30); near(b.y, (100 - b.height) / 2);
+  const tall = fitImageBox(500, 2000, 800, 1000); // limitée par la hauteur
+  near(tall.height, 40); near(tall.width, (100 / 800) * 100);
+  near(tall.x, (100 - tall.width) / 2);
+});
+
+test("describeBuild", () => {
+  assert.equal(describeBuild({ version: "1.2.3", commit: "abc1234", buildDate: "" }), "Version 1.2.3 · commit abc1234");
+  assert.ok(describeBuild({ version: "1", commit: "x", buildDate: "2026-11-18T09:24:00Z" }).includes("build du"));
 });
 
 console.log(`\n${passed} tests OK`);

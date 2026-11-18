@@ -5,6 +5,7 @@
       <div class="brand">
         <FilePdf size="22" class="brand-icon" />
         <span class="brand-name">PDF Studio</span>
+        <span class="app-version" v-tooltip.bottom="buildInfo">v{{ appVersion }} · {{ appCommit }}</span>
       </div>
 
       <div class="divider"></div>
@@ -74,7 +75,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'mask' }"
             @click="setTool('mask')"
-            v-tooltip.bottom="'Masquer : recouvre une zone d\'un aplat de la couleur du fond'"
+            v-tooltip.bottom="'Blanco : recouvre une zone du PDF (texte natif compris). Masquage visuel : le texte reste dans le fichier.'"
           >
             <ToolIcon name="mask" />
           </Button>
@@ -89,6 +90,20 @@
             v-tooltip.bottom="'Ajouter du texte'"
           >
             <ToolIcon name="text" />
+          </Button>
+          <input
+            type="file"
+            ref="imageInput"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            class="hidden-file-input"
+            @change="onImageChange"
+          />
+          <Button
+            class="p-button-text header-icon-btn"
+            @click="triggerImageSelect"
+            v-tooltip.bottom="'Insérer une image (PNG, JPG)'"
+          >
+            <ToolIcon name="image" />
           </Button>
           <Button
             class="p-button-text header-icon-btn signature-btn"
@@ -140,7 +155,13 @@
           <template v-else-if="styleContext === 'mask'">
             <button
               class="preset-btn"
-              :class="{ active: !selectedAnnotation && maskColor === 'auto' }"
+              :class="{ active: maskIsWhite }"
+              title="Recouvrir en blanc"
+              @click="setMaskColor('#ffffff')"
+            >Blanc</button>
+            <button
+              class="preset-btn"
+              :class="{ active: maskIsAuto }"
               title="Reprend la couleur du fond de la page autour de la zone"
               @click="setMaskColor('auto')"
             >Auto</button>
@@ -245,6 +266,7 @@ import { usePdfStore } from '@/stores/pdfStore';
 import SignatureModal from './SignatureModal.vue';
 import ToolIcon from './ToolIcon.vue';
 import Button from 'primevue/button';
+import { appInfo, describeBuild } from '@/utils/appInfo';
 
 export default {
   name: 'AppToolbar',
@@ -252,6 +274,9 @@ export default {
   data() {
     return {
       showSigModal: false,
+      appVersion: appInfo.version,
+      appCommit: appInfo.commit,
+      buildInfo: describeBuild(),
       highlightPalette: ['#FFFF00', '#7CFC00', '#FF8DC7', '#FFA500', '#4FC3F7'],
       highlightPresets: [
         { label: 'S', value: 10, title: 'Fin (10 px)' },
@@ -292,17 +317,27 @@ export default {
     highlightWidthValue() {
       return Math.round(this.selectedHighlight ? this.selectedHighlight.strokeWidth : this.highlightWidth);
     },
-    maskColorValue() {
+    // Blanco : un masque est-il sélectionné ? Sinon on affiche le réglage de l'outil.
+    selectedMask() {
       const a = this.selectedAnnotation;
-      if (a && a.type === 'mask' && this.activeTool === 'select') return a.color || '#ffffff';
+      return a && a.type === 'mask' && this.activeTool === 'select' ? a : null;
+    },
+    maskColorValue() {
+      if (this.selectedMask) return this.selectedMask.color || '#ffffff';
       return this.maskColor === 'auto' ? '#ffffff' : this.maskColor;
+    },
+    maskIsWhite() {
+      return this.maskColorValue.toLowerCase() === '#ffffff' && (this.selectedMask || this.maskColor !== 'auto');
+    },
+    maskIsAuto() {
+      return !this.selectedMask && this.maskColor === 'auto';
     }
   },
   methods: {
     ...mapActions(usePdfStore, [
       'addFiles', 'setPage', 'exportPdf', 'clearAll', 'setTool',
       'setAnnotationColor', 'setStrokeWidth', 'setHighlightColor', 'setHighlightWidth', 'setMaskColor',
-      'undo', 'redo', 'addAnnotationToCurrentPage'
+      'undo', 'redo', 'addAnnotationToCurrentPage', 'addImageFromFile'
     ]),
     triggerFileSelect() { this.$refs.fileInput.click(); },
     onFileChange(e) {
@@ -312,6 +347,12 @@ export default {
     prevPage() { this.setPage(this.currentPage - 1); },
     nextPage() { this.setPage(this.currentPage + 1); },
     openSignatureModal() { this.showSigModal = true; },
+    triggerImageSelect() { this.$refs.imageInput.click(); },
+    onImageChange(e) {
+      const file = e.target.files && e.target.files[0];
+      if (file) this.addImageFromFile(file);
+      e.target.value = ''; // permet de re-sélectionner le même fichier
+    },
     applySignature(dataUrl) {
       // On repasse en sélection pour que la signature soit tout de suite déplaçable / redimensionnable
       this.setTool('select');
@@ -545,6 +586,18 @@ export default {
 }
 
 :deep(.p-button.header-icon-btn:disabled) { opacity: 0.35; }
+
+/* Numéro de version / commit déployé */
+.app-version {
+  margin-left: 8px;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  cursor: default;
+}
+@media (max-width: 900px) {
+  .app-version { display: none; }
+}
 
 /* Responsive : Masque le texte des boutons sur petit écran */
 @media (max-width: 1024px) {

@@ -4,6 +4,8 @@
     :page-width="pageWidth"
     :page-height="pageHeight"
     :is-selected="isSelected"
+    :lock-aspect="isImage"
+    :corners-only="isImage"
     :min-width="30"
     :min-height="16"
     @select="$emit('select', annotation.id)"
@@ -17,7 +19,7 @@
 <script>
 import TransformBox from "./TransformBox.vue";
 
-// Rendu des éléments de type "signature" (et, au lot suivant, "image") : image ajustée dans la boîte
+// Rendu des éléments "signature" et "image" : image ajustée dans la boîte (mêmes contrôles que le texte)
 export default {
   name: "SignatureAnnotationOverlay",
   components: { TransformBox },
@@ -28,6 +30,11 @@ export default {
     isSelected: { type: Boolean, default: false },
   },
   emits: ["update", "delete", "select"],
+  computed: {
+    isImage() {
+      return this.annotation.type === "image";
+    },
+  },
 };
 </script>
 

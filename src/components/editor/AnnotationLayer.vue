@@ -63,6 +63,7 @@ import { buildStrokeAnnotation, hitTest, pointsToPath, sampleBackground } from "
 const COMPONENTS = {
   text: "TextAnnotationOverlay",
   signature: "SignatureAnnotationOverlay",
+  image: "SignatureAnnotationOverlay",
   drawing: "StrokeAnnotation",
   highlight: "StrokeAnnotation",
   mask: "MaskAnnotation",
