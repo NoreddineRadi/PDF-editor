@@ -1,7 +1,7 @@
 // Tests sans dépendance : node tests/geometry.test.mjs  (ou : yarn test)
 import assert from "node:assert/strict";
 import {
-  localToView, viewToLocal, viewToUser, hitTest, buildStrokeAnnotation, pointsToPath, normalizeRightAngle,
+  localToView, viewToLocal, viewToUser, hitTest, placeToolbar, buildStrokeAnnotation, pointsToPath, normalizeRightAngle,
 } from "../src/utils/annotationGeometry.js";
 import { buildPageOps } from "../src/services/annotationOps.js";
 import { fitImageBox } from "../src/utils/imageHelpers.js";
@@ -143,6 +143,33 @@ test("fitImageBox : tient dans 40 % de la page, proportions respectées, centré
 test("describeBuild", () => {
   assert.equal(describeBuild({ version: "1.2.3", commit: "abc1234", buildDate: "" }), "Version 1.2.3 · commit abc1234");
   assert.ok(describeBuild({ version: "1", commit: "x", buildDate: "2026-11-18T09:24:00Z" }).includes("build du"));
+});
+
+
+test("barre flottante : du côté opposé à la poignée de rotation", () => {
+  const mid = { cy: 500, w: 200, h: 80, pageHeight: 1000 };
+  assert.equal(placeToolbar({ ...mid, rot: 0 }).side, "below");   // poignée en haut -> barre en bas
+  assert.equal(placeToolbar({ ...mid, rot: 180 }).side, "above"); // poignée en bas -> barre en haut
+});
+
+test("barre flottante : ne recouvre jamais la poignée, pour toutes les rotations et positions", () => {
+  const TB = 34, TIP = 7; // hauteur de la barre ; demi-hauteur de la poignée (14 px)
+  for (const cy of [20, 90, 500, 910, 980]) {
+    for (const rot of [0, 15, 45, 90, 135, 180, 225, 270, 315, 345]) {
+      for (const [w, h] of [[200, 80], [60, 60], [40, 300]]) {
+        const { top } = placeToolbar({ cy, w, h, rot, pageHeight: 1000 });
+        const tipY = -Math.cos((rot * Math.PI) / 180) * (h / 2 + 37); // position verticale de la poignée
+        const lo = top, hi = top + TB;                                 // intervalle vertical de la barre
+        assert.ok(hi <= tipY - TIP || lo >= tipY + TIP, `chevauchement cy=${cy} rot=${rot} ${w}x${h}`);
+      }
+    }
+  }
+});
+
+test("barre flottante : bascule de côté quand la page n'a pas la place", () => {
+  const nearBottom = placeToolbar({ cy: 960, w: 200, h: 80, rot: 0, pageHeight: 1000 });
+  assert.equal(nearBottom.side, "above");
+  assert.ok(nearBottom.top < -(40 + 37)); // au-delà de la poignée (elle est au-dessus)
 });
 
 console.log(`\n${passed} tests OK`);

@@ -40,7 +40,7 @@
 </template>
 
 <script>
-import { toRad, normalizeDeg } from "@/utils/annotationGeometry";
+import { toRad, normalizeDeg, placeToolbar } from "@/utils/annotationGeometry";
 
 const HANDLES = [
   { id: "nw", dirX: -1, dirY: -1 },
@@ -116,18 +116,11 @@ export default {
       };
     },
 
-    // Demi-hauteur de l'enveloppe horizontale de la boîte pivotée
-    halfExtentY() {
-      const g = this.geo;
-      const r = toRad(g.rot);
-      return (Math.abs(g.w * Math.sin(r)) + Math.abs(g.h * Math.cos(r))) / 2;
-    },
-
+    // La barre se place du côté opposé à la poignée de rotation (voir placeToolbar)
     toolbarStyle() {
-      const below = this.geo.cy - this.halfExtentY < 52;
-      return {
-        top: below ? `${this.halfExtentY + 14}px` : `${-(this.halfExtentY + 46)}px`,
-      };
+      const g = this.geo;
+      const { top } = placeToolbar({ cy: g.cy, w: g.w, h: g.h, rot: g.rot, pageHeight: this.pageHeight });
+      return { top: `${top}px` };
     },
 
     handles() {

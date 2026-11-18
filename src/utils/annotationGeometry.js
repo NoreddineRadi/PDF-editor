@@ -91,6 +91,33 @@ export function hitTest(ann, X, Y, vw, vh, zoom = 1) {
   return l.x >= -t && l.x <= b.w + t && l.y >= -t && l.y <= b.h + t;
 }
 
+/**
+ * Où placer la barre flottante (taille, couleur…) pour qu'elle ne recouvre jamais la poignée de rotation.
+ * La poignée est au-dessus de la boîte dans son repère (donc elle tourne avec elle) : la barre se met du côté
+ * OPPOSÉ à la poignée ; si la page n'a pas la place, elle passe de l'autre côté mais au-delà de la poignée.
+ *
+ * @param {{cy:number,w:number,h:number,rot:number,pageHeight:number}} box  centre vertical, taille (px) et angle (°)
+ * @returns {{side:'above'|'below', top:number}} top = décalage vertical depuis le centre de la boîte (px)
+ */
+export function placeToolbar({ cy, w, h, rot, pageHeight, toolbarHeight = 34, gap = 12, handleReach = 37 }) {
+  const r = toRad(rot);
+  const halfY = (Math.abs(w * Math.sin(r)) + Math.abs(h * Math.cos(r))) / 2;
+  const tipY = -Math.cos(r) * (h / 2 + handleReach); // < 0 : la poignée pointe vers le haut
+  const topExt = Math.max(halfY, tipY < 0 ? -tipY : 0);
+  const botExt = Math.max(halfY, tipY > 0 ? tipY : 0);
+  const room = toolbarHeight + gap;
+
+  let below = tipY <= 0;
+  const fitsBelow = cy + botExt + room <= pageHeight;
+  const fitsAbove = cy - topExt - room >= 0;
+  if (below && !fitsBelow && fitsAbove) below = false;
+  else if (!below && !fitsAbove && fitsBelow) below = true;
+
+  return below
+    ? { side: 'below', top: botExt + gap }
+    : { side: 'above', top: -(topExt + gap + toolbarHeight) };
+}
+
 /** Courbe lissée (Bézier quadratiques aux points médians) ; fonctionne dans n'importe quelle unité. */
 export function pointsToPath(points, eps = 0.01) {
   if (!points || points.length === 0) return "";
