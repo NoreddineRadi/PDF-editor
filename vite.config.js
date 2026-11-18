@@ -27,7 +27,7 @@ function resolveCommit() {
 }
 
 export default defineConfig({
-  base: '/pdf-editor/',
+  base: '/pdf-editor',
   plugins: [vue()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
