@@ -7,6 +7,7 @@ import { buildPageOps } from "../src/services/annotationOps.js";
 import { fitImageBox } from "../src/utils/imageHelpers.js";
 import { getPrimitives, flattenSegs, segsToSvgPath } from "../src/utils/shapeDefs.js";
 import { reorderList, offsetCopy, nudgePosition } from "../src/utils/annotationOrder.js";
+import { parsePageRange } from "../src/utils/pageRange.js";
 import { describeBuild } from "../src/utils/appInfo.js";
 
 let passed = 0;
@@ -249,6 +250,19 @@ test("duplication et déplacement clavier", () => {
   const edge = offsetCopy({ x: 79, y: 89, width: 20, height: 10 }); near(edge.x, 77); near(edge.y, 87);
   const n = nudgePosition(a, 1, -1); near(n.x, 11); near(n.y, 9);
   const out = nudgePosition({ x: 90, y: 0, width: 20, height: 10 }, 50, -50); near(out.x + 10, 100); near(out.y + 5, 0);
+});
+
+test("plage de pages : formats valides", () => {
+  assert.deepEqual(parsePageRange("1-3, 5", 10), [0, 1, 2, 4]);
+  assert.deepEqual(parsePageRange("5,1,3-4,4", 5), [0, 2, 3, 4]);
+  assert.deepEqual(parsePageRange(" 2 ; 4 - 6 ", 6), [1, 3, 4, 5]);
+  assert.deepEqual(parsePageRange("7", 7), [6]);
+});
+test("plage de pages : saisies invalides -> null", () => {
+  for (const bad of ["", "  ", "0", "1-", "-3", "3-1", "a", "1-3x", "11", "1-11", "1..3"]) {
+    assert.equal(parsePageRange(bad, 10), null, JSON.stringify(bad));
+  }
+  assert.equal(parsePageRange("1", 0), null);
 });
 
 console.log(`\n${passed} tests OK`);

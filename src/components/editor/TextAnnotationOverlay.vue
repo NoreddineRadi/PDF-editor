@@ -17,27 +17,27 @@
       v-model="localText"
       class="text-input"
       :style="textStyle"
-      placeholder="Saisissez votre texte..."
+      :placeholder="$t('el.textPlaceholder')"
       spellcheck="false"
       @input="onTextChange"
       @focus="$emit('select', annotation.id)"
     ></textarea>
 
     <template #toolbar>
-      <button class="tbox-btn" title="Réduire la taille" @click.stop="changeFontSize(-2)">−</button>
+      <button class="tbox-btn" :title="$t('el.smaller')" @click.stop="changeFontSize(-2)">−</button>
       <span class="tbox-label">{{ annotation.fontSize || 16 }} pt</span>
-      <button class="tbox-btn" title="Agrandir la taille" @click.stop="changeFontSize(2)">+</button>
+      <button class="tbox-btn" :title="$t('el.bigger')" @click.stop="changeFontSize(2)">+</button>
       <span class="tbox-sep"></span>
       <input
         type="color"
         class="tbox-color"
-        title="Couleur du texte"
+        :title="$t('el.textColor')"
         :value="annotation.color || '#000000'"
         @input="(e) => $emit('update', { color: e.target.value })"
         @click.stop
       />
       <span class="tbox-sep"></span>
-      <button class="tbox-btn tbox-drag" title="Déplacer" @pointerdown.stop.prevent="$refs.tbox.startDrag($event)">✥</button>
+      <button class="tbox-btn tbox-drag" :title="$t('el.move')" @pointerdown.stop.prevent="$refs.tbox.startDrag($event)">✥</button>
     </template>
   </TransformBox>
 </template>

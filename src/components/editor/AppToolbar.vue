@@ -22,10 +22,10 @@
       <Button 
         class="p-button-outlined p-button-secondary p-button-sm open-btn" 
         @click="triggerFileSelect"
-        v-tooltip.bottom="hasDocument ? 'Ajouter des fichiers' : 'Ouvrir un PDF'"
+        v-tooltip.bottom="$t(hasDocument ? 'tb.addTip' : 'tb.openTip')"
       >
         <Plus size="14" />
-        <span class="btn-label">{{ hasDocument ? 'Ajouter' : 'Ouvrir' }}</span>
+        <span class="btn-label">{{ $t(hasDocument ? 'tb.add' : 'tb.open') }}</span>
       </Button>
     </div>
 
@@ -39,7 +39,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'select' }"
             @click="setTool('select')"
-            v-tooltip.bottom="'Sélectionner / déplacer / pivoter (Échap)'"
+            v-tooltip.bottom="$t('tool.select')"
           >
             <ToolIcon name="select" />
           </Button>
@@ -51,7 +51,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'draw' }"
             @click="setTool('draw')"
-            v-tooltip.bottom="'Crayon'"
+            v-tooltip.bottom="$t('tool.pen')"
           >
             <ToolIcon name="pen" />
           </Button>
@@ -59,7 +59,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'highlight' }"
             @click="setTool('highlight')"
-            v-tooltip.bottom="'Surligneur'"
+            v-tooltip.bottom="$t('tool.highlighter')"
           >
             <ToolIcon name="highlighter" />
           </Button>
@@ -67,7 +67,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'eraser' }"
             @click="setTool('eraser')"
-            v-tooltip.bottom="'Gomme : supprime les éléments ajoutés que vous touchez'"
+            v-tooltip.bottom="$t('tool.eraser')"
           >
             <ToolIcon name="eraser" />
           </Button>
@@ -75,7 +75,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'mask' }"
             @click="setTool('mask')"
-            v-tooltip.bottom="'Blanco : recouvre une zone du PDF (texte natif compris). Masquage visuel : le texte reste dans le fichier.'"
+            v-tooltip.bottom="$t('tool.mask')"
           >
             <ToolIcon name="mask" />
           </Button>
@@ -87,7 +87,7 @@
             class="p-button-text header-icon-btn"
             :class="{ 'tool-active': activeTool === 'text' }"
             @click="setTool('text')"
-            v-tooltip.bottom="'Ajouter du texte'"
+            v-tooltip.bottom="$t('tool.text')"
           >
             <ToolIcon name="text" />
           </Button>
@@ -101,13 +101,13 @@
           <Button
             class="p-button-text header-icon-btn"
             @click="triggerImageSelect"
-            v-tooltip.bottom="'Insérer une image (PNG, JPG)'"
+            v-tooltip.bottom="$t('tool.image')"
           >
             <ToolIcon name="image" />
           </Button>
           <ToolMenu
             icon="shapes"
-            title="Formes : rectangle, carré, cercle, triangle, ligne"
+            :title="$t('tool.shapes')"
             :active="activeTool === 'shape'"
             :items="shapeItems"
             :current="shapeKind"
@@ -115,7 +115,7 @@
           />
           <ToolMenu
             icon="symbols"
-            title="Symboles : cases à cocher, boutons radio, coche, puce (clic pour poser)"
+            :title="$t('tool.symbols')"
             :active="activeTool === 'symbol'"
             :items="symbolItems"
             :current="symbolKind"
@@ -124,7 +124,7 @@
           <Button
             class="p-button-text header-icon-btn signature-btn"
             @click="openSignatureModal"
-            v-tooltip.bottom="'Ajouter une signature manuscrite'"
+            v-tooltip.bottom="$t('tool.signature')"
           >
             <ToolIcon name="signature" />
           </Button>
@@ -143,7 +143,7 @@
               :title="c"
               @click="setHighlightColor(c)"
             ></button>
-            <div class="color-picker-wrapper" v-tooltip.bottom="'Autre couleur'">
+            <div class="color-picker-wrapper" v-tooltip.bottom="$t('style.otherColor')">
               <input type="color" :value="highlightColorValue" @input="(e) => setHighlightColor(e.target.value)" class="color-picker-input" />
             </div>
             <span class="style-sep"></span>
@@ -152,7 +152,7 @@
               :key="p.value"
               class="preset-btn"
               :class="{ active: highlightWidthValue === p.value }"
-              :title="p.title"
+              :title="$t(p.titleKey)"
               @click="setHighlightWidth(p.value)"
             >{{ p.label }}</button>
             <input
@@ -172,23 +172,23 @@
             <button
               class="preset-btn"
               :class="{ active: maskIsWhite }"
-              title="Recouvrir en blanc"
+              :title="$t('mask.whiteTip')"
               @click="setMaskColor('#ffffff')"
-            >Blanc</button>
+            >{{ $t('mask.white') }}</button>
             <button
               class="preset-btn"
               :class="{ active: maskIsAuto }"
-              title="Reprend la couleur du fond de la page autour de la zone"
+              :title="$t('mask.autoTip')"
               @click="setMaskColor('auto')"
-            >Auto</button>
-            <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur du masque'">
+            >{{ $t('mask.auto') }}</button>
+            <div class="color-picker-wrapper" v-tooltip.bottom="$t('mask.color')">
               <input type="color" :value="maskColorValue" @input="(e) => setMaskColor(e.target.value)" class="color-picker-input" />
             </div>
           </template>
 
           <!-- Formes et symboles -->
           <template v-else-if="styleContext === 'shape' || styleContext === 'symbol'">
-            <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur du contour'">
+            <div class="color-picker-wrapper" v-tooltip.bottom="$t('style.outlineColor')">
               <input type="color" :value="annotationColor" @input="(e) => setAnnotationColor(e.target.value)" class="color-picker-input" />
             </div>
             <select :value="strokeWidthValue" @change="onStrokeWidthChange" class="stroke-select">
@@ -196,9 +196,9 @@
             </select>
             <template v-if="styleContext === 'shape' && !isLineKind">
               <span class="style-sep"></span>
-              <button class="preset-btn" :class="{ active: !fillValue }" title="Sans remplissage" @click="setShapeFill(null)">Vide</button>
-              <button class="preset-btn" :class="{ active: !!fillValue }" title="Remplir la forme" @click="setShapeFill(fillValue || fillPickerValue)">Plein</button>
-              <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur de remplissage'">
+              <button class="preset-btn" :class="{ active: !fillValue }" :title="$t('style.fillNoneTip')" @click="setShapeFill(null)">{{ $t('style.fillNone') }}</button>
+              <button class="preset-btn" :class="{ active: !!fillValue }" :title="$t('style.fillSolidTip')" @click="setShapeFill(fillValue || fillPickerValue)">{{ $t('style.fillSolid') }}</button>
+              <div class="color-picker-wrapper" v-tooltip.bottom="$t('style.fillColor')">
                 <input type="color" :value="fillPickerValue" @input="(e) => setShapeFill(e.target.value)" class="color-picker-input" />
               </div>
             </template>
@@ -206,14 +206,14 @@
 
           <!-- Crayon / texte -->
           <template v-else>
-            <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur'">
+            <div class="color-picker-wrapper" v-tooltip.bottom="$t('style.color')">
               <input type="color" :value="annotationColor" @input="(e) => setAnnotationColor(e.target.value)" class="color-picker-input" />
             </div>
             <select v-if="styleContext === 'draw'" :value="strokeWidth" @change="onStrokeWidthChange" class="stroke-select">
-              <option :value="2">Fin (2px)</option>
-              <option :value="3">Normal (3px)</option>
-              <option :value="4">Moyen (4px)</option>
-              <option :value="8">Épais (8px)</option>
+              <option :value="2">{{ $t('stroke.fine') }}</option>
+              <option :value="3">{{ $t('stroke.normal') }}</option>
+              <option :value="4">{{ $t('stroke.medium') }}</option>
+              <option :value="8">{{ $t('stroke.thick') }}</option>
             </select>
           </template>
         </div>
@@ -224,7 +224,7 @@
             class="p-button-text header-icon-btn"
             :disabled="!canUndo"
             @click="undo"
-            v-tooltip.bottom="'Annuler (Ctrl+Z)'"
+            v-tooltip.bottom="$t('tb.undo')"
           >
             <ToolIcon name="undo" />
           </Button>
@@ -232,7 +232,7 @@
             class="p-button-text header-icon-btn"
             :disabled="!canRedo"
             @click="redo"
-            v-tooltip.bottom="'Rétablir (Ctrl+Y)'"
+            v-tooltip.bottom="$t('tb.redo')"
           >
             <ToolIcon name="redo" />
           </Button>
@@ -244,7 +244,7 @@
             class="p-button-text header-icon-btn"
             :disabled="currentPage <= 1"
             @click="prevPage"
-            v-tooltip.bottom="'Page précédente'"
+            v-tooltip.bottom="$t('tb.prevPage')"
           >
             <ChevronLeft size="16" />
           </Button>
@@ -255,7 +255,7 @@
             class="p-button-text header-icon-btn"
             :disabled="currentPage >= pageCount"
             @click="nextPage"
-            v-tooltip.bottom="'Page suivante'"
+            v-tooltip.bottom="$t('tb.nextPage')"
           >
             <ChevronRight size="16" />
           </Button>
@@ -266,13 +266,32 @@
 
     <!-- 3. BLOC DROITE : Actions d'Exportation -->
     <div class="header-right">
+      <a
+        v-if="donateUrl"
+        class="donate-link"
+        :href="donateUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        v-tooltip.bottom="$t('tb.donateTip')"
+      >♥ <span class="btn-label">{{ $t('tb.donate') }}</span></a>
+
+      <select
+        class="lang-select"
+        :value="currentLocale"
+        :aria-label="$t('tb.language')"
+        v-tooltip.bottom="$t('tb.language')"
+        @change="onLocaleChange"
+      >
+        <option v-for="l in locales" :key="l" :value="l">{{ l.toUpperCase() }}</option>
+      </select>
+
       <Button 
         v-if="hasSelection" 
         class="p-button-sm extract-btn" 
         @click="exportPdf(true)"
       >
         <FileExport size="15" />
-        <span class="btn-label">Extraire ({{ selectedCount }})</span>
+        <span class="btn-label">{{ $t('tb.extract', { n: selectedCount }) }}</span>
       </Button>
 
       <Button 
@@ -281,13 +300,16 @@
         @click="exportPdf(false)"
       >
         <Download size="15" />
-        <span class="btn-label">Exporter</span>
+        <span class="btn-label">{{ $t('tb.export') }}</span>
       </Button>
     </div>
 
     <!-- Modal Signature -->
     <SignatureModal 
+      v-if="showSigModal"
       :visible="showSigModal" 
+      :page-count="pageCount"
+      :current-page="currentPage"
       @close="showSigModal = false" 
       @save="applySignature" 
     />
@@ -297,45 +319,56 @@
 <script>
 import { mapState, mapActions } from 'pinia';
 import { usePdfStore } from '@/stores/pdfStore';
-import SignatureModal from './SignatureModal.vue';
+import { defineAsyncComponent } from 'vue';
 import ToolIcon from './ToolIcon.vue';
 import ToolMenu from './ToolMenu.vue';
 import Button from 'primevue/button';
 import { appInfo, describeBuild } from '@/utils/appInfo';
+import { locale, LOCALES, t, switchLocaleUrl } from '@/i18n';
 
 export default {
   name: 'AppToolbar',
-  components: { Button, SignatureModal, ToolIcon, ToolMenu },
+  components: {
+    Button,
+    SignatureModal: defineAsyncComponent(() => import('./SignatureModal.vue')),
+    ToolIcon,
+    ToolMenu
+  },
   data() {
     return {
       showSigModal: false,
+      locales: LOCALES,
+      donateUrl: appInfo.donateUrl, // facultatif : sans lien configuré, aucun bouton affiché
       appVersion: appInfo.version,
       appCommit: appInfo.commit,
       buildInfo: describeBuild(),
       shapeItems: [
-        { value: 'rect', label: 'Rectangle', ann: { type: 'shape', shape: 'rect' }, w: 22, h: 14 },
-        { value: 'square', label: 'Carré', ann: { type: 'shape', shape: 'rect' } },
-        { value: 'circle', label: 'Cercle', ann: { type: 'shape', shape: 'ellipse' } },
-        { value: 'triangle', label: 'Triangle', ann: { type: 'shape', shape: 'triangle' } },
-        { value: 'line', label: 'Ligne droite', icon: 'line' }
+        { value: 'rect', labelKey: 'shape.rect', ann: { type: 'shape', shape: 'rect' }, w: 22, h: 14 },
+        { value: 'square', labelKey: 'shape.square', ann: { type: 'shape', shape: 'rect' } },
+        { value: 'circle', labelKey: 'shape.circle', ann: { type: 'shape', shape: 'ellipse' } },
+        { value: 'triangle', labelKey: 'shape.triangle', ann: { type: 'shape', shape: 'triangle' } },
+        { value: 'line', labelKey: 'shape.line', icon: 'line' }
       ],
       symbolItems: [
-        { value: 'checkbox', label: 'Case décochée', ann: { type: 'symbol', symbol: 'checkbox' } },
-        { value: 'checkbox-checked', label: 'Case cochée', ann: { type: 'symbol', symbol: 'checkbox-checked' } },
-        { value: 'radio', label: 'Radio décoché', ann: { type: 'symbol', symbol: 'radio' } },
-        { value: 'radio-checked', label: 'Radio coché', ann: { type: 'symbol', symbol: 'radio-checked' } },
-        { value: 'check', label: 'Coche ✓', ann: { type: 'symbol', symbol: 'check' } },
-        { value: 'bullet', label: 'Puce •', ann: { type: 'symbol', symbol: 'bullet' } }
+        { value: 'checkbox', labelKey: 'symbol.checkbox', ann: { type: 'symbol', symbol: 'checkbox' } },
+        { value: 'checkbox-checked', labelKey: 'symbol.checkbox-checked', ann: { type: 'symbol', symbol: 'checkbox-checked' } },
+        { value: 'radio', labelKey: 'symbol.radio', ann: { type: 'symbol', symbol: 'radio' } },
+        { value: 'radio-checked', labelKey: 'symbol.radio-checked', ann: { type: 'symbol', symbol: 'radio-checked' } },
+        { value: 'check', labelKey: 'symbol.check', ann: { type: 'symbol', symbol: 'check' } },
+        { value: 'bullet', labelKey: 'symbol.bullet', ann: { type: 'symbol', symbol: 'bullet' } }
       ],
       highlightPalette: ['#FFFF00', '#7CFC00', '#FF8DC7', '#FFA500', '#4FC3F7'],
       highlightPresets: [
-        { label: 'S', value: 10, title: 'Fin (10 px)' },
-        { label: 'M', value: 20, title: 'Moyen (20 px)' },
-        { label: 'L', value: 36, title: 'Large (36 px)' }
+        { label: 'S', value: 10, titleKey: 'hl.fine' },
+        { label: 'M', value: 20, titleKey: 'hl.medium' },
+        { label: 'L', value: 36, titleKey: 'hl.large' }
       ]
     };
   },
   computed: {
+    currentLocale() {
+      return locale.value;
+    },
     ...mapState(usePdfStore, [
       'hasDocument', 'currentPage', 'pageCount',
       'hasSelection', 'selectedCount', 'activeTool', 'annotationColor',
@@ -414,7 +447,7 @@ export default {
     ...mapActions(usePdfStore, [
       'addFiles', 'setPage', 'exportPdf', 'clearAll', 'setTool',
       'setAnnotationColor', 'setStrokeWidth', 'setShapeKind', 'setSymbolKind', 'setShapeFill', 'setHighlightColor', 'setHighlightWidth', 'setMaskColor',
-      'undo', 'redo', 'addAnnotationToCurrentPage', 'addImageFromFile'
+      'undo', 'redo', 'addAnnotationToCurrentPage', 'addAnnotationToPages', 'addImageFromFile', 'notify'
     ]),
     triggerFileSelect() { this.$refs.fileInput.click(); },
     onFileChange(e) {
@@ -430,10 +463,19 @@ export default {
       if (file) this.addImageFromFile(file);
       e.target.value = ''; // permet de re-sélectionner le même fichier
     },
-    applySignature(dataUrl) {
+    onLocaleChange(e) {
+      const target = e.target.value;
+      // Page statique distincte par langue : on recharge, donc on prévient si un document est ouvert
+      if (this.hasDocument && !window.confirm(t('tb.langConfirm'))) {
+        e.target.value = this.currentLocale;
+        return;
+      }
+      window.location.assign(switchLocaleUrl(target));
+    },
+    applySignature(dataUrl, { pages } = {}) {
       // On repasse en sélection pour que la signature soit tout de suite déplaçable / redimensionnable
       this.setTool('select');
-      this.addAnnotationToCurrentPage({
+      const signature = {
         type: 'signature',
         dataUrl,
         x: 35,     // Position centrale par défaut
@@ -441,7 +483,10 @@ export default {
         width: 25, // 25 % de la largeur de la page
         height: 10,
         rotation: 0
-      }, { select: true });
+      };
+      const targets = pages && pages.length ? pages : [this.currentPage - 1];
+      const count = this.addAnnotationToPages(signature, targets);
+      if (count > 1) this.notify('success', t('sig.done', { n: count }), t('sig.doneDetail'));
     },
     onStrokeWidthChange(e) {
       this.setStrokeWidth(Number(e.target.value));
@@ -680,4 +725,32 @@ export default {
 @media (max-width: 1024px) {
   .btn-label { display: none; }
 }
+
+/* Langue et don facultatif */
+.lang-select {
+  height: 30px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.donate-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #f9a8d4;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.donate-link:hover { background: #1e293b; }
 </style>

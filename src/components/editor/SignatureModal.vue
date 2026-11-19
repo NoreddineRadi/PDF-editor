@@ -4,7 +4,7 @@
       <div class="modal-header">
         <div class="title">
           <Pencil size="18" />
-          <span>Créer votre signature manuscrite</span>
+          <span>{{ $t('sig.title') }}</span>
         </div>
         <button type="button" class="icon-close-btn" @click="close">
           <Times size="16" />
@@ -27,25 +27,53 @@
             @touchmove.prevent="draw"
             @touchend.prevent="stopDrawing"
           ></canvas>
-          <div v-if="isEmpty" class="placeholder-hint">Dessinez votre signature ici</div>
+          <div v-if="isEmpty" class="placeholder-hint">{{ $t('sig.hint') }}</div>
         </div>
+
+        <!-- Sur quelles pages ? -->
+        <fieldset class="scope-box">
+          <legend>{{ $t('sig.applyTo') }}</legend>
+          <label class="scope-opt">
+            <input v-model="scope" type="radio" value="current" /> {{ $t('sig.scopeCurrent') }}
+          </label>
+          <label v-if="pageCount > 1" class="scope-opt">
+            <input v-model="scope" type="radio" value="all" /> {{ $t('sig.scopeAll', { n: pageCount }) }}
+          </label>
+          <label v-if="pageCount > 1" class="scope-opt">
+            <input v-model="scope" type="radio" value="range" /> {{ $t('sig.scopeRange') }}
+          </label>
+          <div v-if="scope === 'range'" class="scope-range">
+            <input
+              v-model="rangeText"
+              type="text"
+              class="range-input"
+              :class="{ invalid: rangeText && !rangePages }"
+              :placeholder="$t('sig.rangePlaceholder')"
+              inputmode="text"
+              autocomplete="off"
+            />
+            <small :class="{ 'range-error': rangeText && !rangePages }">
+              {{ rangeText && !rangePages ? $t('sig.rangeInvalid', { n: pageCount }) : $t('sig.rangeHelp', { n: pageCount }) }}
+            </small>
+          </div>
+        </fieldset>
       </div>
 
       <div class="modal-footer">
         <Button class="p-button-text p-button-secondary p-button-sm btn-inline" @click="clearPad">
           <Refresh size="14" />
-          <span>Effacer</span>
+          <span>{{ $t('sig.clear') }}</span>
         </Button>
 
         <div class="footer-actions">
-          <Button label="Annuler" class="p-button-text p-button-sm" @click="close" />
+          <Button :label="$t('sig.cancel')" class="p-button-text p-button-sm" @click="close" />
           <Button
             class="p-button-primary p-button-sm btn-inline"
-            :disabled="isEmpty"
+            :disabled="!canSave"
             @click="saveSignature"
           >
             <Check size="14" />
-            <span>Appliquer sur la page</span>
+            <span>{{ $t('sig.apply') }}</span>
           </Button>
         </div>
       </div>
@@ -55,25 +83,48 @@
 
 <script>
 import Button from 'primevue/button';
+import { parsePageRange } from '@/utils/pageRange';
 
 export default {
   name: 'SignatureModal',
   components: { Button },
   props: {
-    visible: { type: Boolean, default: false }
+    visible: { type: Boolean, default: false },
+    pageCount: { type: Number, default: 1 },
+    currentPage: { type: Number, default: 1 } // numéro 1-based
   },
   emits: ['close', 'save'],
   data() {
     return {
       isDrawing: false,
       isEmpty: true,
-      ctx: null
+      ctx: null,
+      scope: 'current', // 'current' | 'all' | 'range'
+      rangeText: ''
     };
   },
+  computed: {
+    rangePages() {
+      return parsePageRange(this.rangeText, this.pageCount);
+    },
+    // Pages visées (indices 0-based) ou null si la plage est invalide
+    targetPages() {
+      if (this.scope === 'all') return Array.from({ length: this.pageCount }, (_, i) => i);
+      if (this.scope === 'range') return this.rangePages;
+      return [this.currentPage - 1];
+    },
+    canSave() {
+      return !this.isEmpty && !!this.targetPages;
+    }
+  },
   watch: {
-    visible(val) {
-      if (val) {
-        this.$nextTick(() => { this.initCanvas(); });
+    // immediate : la modale est créée à la demande (v-if + chargement différé), déjà visible
+    visible: {
+      immediate: true,
+      handler(val) {
+        if (val) {
+          this.$nextTick(() => { this.initCanvas(); });
+        }
       }
     }
   },
@@ -156,9 +207,9 @@ export default {
       return out;
     },
     saveSignature() {
-      if (this.isEmpty) return;
+      if (!this.canSave) return;
       const trimmed = this.trimCanvas(this.$refs.sigCanvas);
-      this.$emit('save', trimmed.toDataURL('image/png'));
+      this.$emit('save', trimmed.toDataURL('image/png'), { pages: this.targetPages });
       this.close();
     },
     close() {
@@ -257,6 +308,31 @@ export default {
   display: flex;
   gap: 0.5rem;
 }
+
+.scope-box {
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.9rem 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  color: #334155;
+  font-size: 0.9rem;
+}
+.scope-box legend { padding: 0 0.4rem; font-weight: 600; font-size: 0.85rem; color: #475569; }
+.scope-opt { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.scope-range { flex-basis: 100%; display: flex; flex-direction: column; gap: 0.3rem; }
+.range-input {
+  max-width: 260px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.range-input.invalid { border-color: #ef4444; }
+.scope-range small { color: #64748b; }
+.scope-range small.range-error { color: #dc2626; }
 
 .btn-inline {
   display: inline-flex;

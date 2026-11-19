@@ -9,11 +9,17 @@
   --app-primary-hover: #2563eb;
 }
 
+html {
+  /* La page défile verticalement : l'éditeur occupe le premier écran, le contenu éditorial (SEO) est en dessous */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
 body,
 html {
   margin: 0;
   padding: 0;
-  height: 100%;
   width: 100%;
   font-family:
     "Inter",
@@ -22,8 +28,13 @@ html {
     "Segoe UI",
     Roboto,
     sans-serif;
-  overflow: hidden;
   background-color: var(--app-workspace-bg);
+}
+
+body { min-height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 /* Utilitaires minimaux (PrimeFlex n'est pas installé, mais ces classes sont utilisées dans les templates) */

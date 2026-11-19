@@ -3,7 +3,7 @@
     <!-- État de Chargement -->
     <div v-if="isLoading" class="state-container">
       <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
-      <p class="state-text">Traitement du document...</p>
+      <p class="state-text">{{ $t('vw.processing') }}</p>
     </div>
 
     <!-- Zone de dépôt interactive (Drag & Drop) -->
@@ -12,14 +12,16 @@
         <div class="icon-circle">
           <CloudUpload :size="36" />
         </div>
-        <h2 class="dropzone-title">Glissez-déposez vos fichiers PDF ici</h2>
-        <p class="dropzone-subtitle">Importez un ou plusieurs PDF pour les réordonner, les extraire ou les fusionner</p>
+        <h2 class="dropzone-title">{{ $t('vw.dropTitle') }}</h2>
+        <p class="dropzone-subtitle">{{ $t('vw.dropSubtitle') }}</p>
 
         <input type="file" ref="dropzoneFileInput" accept="application/pdf" multiple class="hidden-file-input" @change="onFileSelect" />
         <Button class="p-button-raised p-button-primary mt-4 flex align-items-center gap-2" @click="openFilePicker">
           <FolderOpen :size="18" />
-          <span>Parcourir les fichiers</span>
+          <span>{{ $t('vw.browse') }}</span>
         </Button>
+        <p class="dropzone-privacy">{{ $t('vw.privacy') }}</p>
+        <a class="dropzone-guide" href="#seo-content">{{ $t('vw.guide') }} ↓</a>
       </div>
     </div>
 
@@ -213,6 +215,7 @@ export default {
   background-color: #0f172a;
   display: flex;
   overflow: auto;
+  overscroll-behavior: contain; /* le défilement ne "remonte" pas à la page (contenu éditorial en dessous) */
   position: relative;
   height: 100%;
 }
@@ -278,6 +281,18 @@ export default {
   margin: 0 0 0.5rem 0;
 }
 
+.dropzone-guide {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #2563eb;
+}
+.dropzone-privacy {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  max-width: 28rem;
+}
 .dropzone-subtitle {
   font-size: 0.9rem;
   color: #64748b;

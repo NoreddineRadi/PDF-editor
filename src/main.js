@@ -8,11 +8,13 @@ import Tooltip from 'primevue/tooltip';
 
 import App from './App.vue';
 import { installPrimeIcons } from './primeicons.js';
+import { i18nPlugin } from './i18n/index.js';
 import './assets/styles/main.css';
 
 const app = createApp(App);
 installPrimeIcons(app);
 app.use(createPinia());
+app.use(i18nPlugin);
 
 app.use(PrimeVue, {
   theme: {

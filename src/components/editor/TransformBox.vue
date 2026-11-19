@@ -10,11 +10,11 @@
     >
       <slot name="toolbar" />
       <span v-if="$slots.toolbar" class="tbox-sep"></span>
-      <button class="tbox-btn" title="Dupliquer (Ctrl+D)" @click.stop="$emit('duplicate', annotation.id)">⧉</button>
-      <button class="tbox-btn" title="Premier plan" @click.stop="$emit('reorder', annotation.id, 'front')">⤒</button>
-      <button class="tbox-btn" title="Arrière-plan" @click.stop="$emit('reorder', annotation.id, 'back')">⤓</button>
+      <button class="tbox-btn" :title="$t('el.duplicate')" @click.stop="$emit('duplicate', annotation.id)">⧉</button>
+      <button class="tbox-btn" :title="$t('el.front')" @click.stop="$emit('reorder', annotation.id, 'front')">⤒</button>
+      <button class="tbox-btn" :title="$t('el.back')" @click.stop="$emit('reorder', annotation.id, 'back')">⤓</button>
       <span class="tbox-sep"></span>
-      <button class="tbox-btn tbox-danger" title="Supprimer (Suppr)" @click.stop="$emit('delete', annotation.id)">✕</button>
+      <button class="tbox-btn tbox-danger" :title="$t('el.delete')" @click.stop="$emit('delete', annotation.id)">✕</button>
     </div>
 
     <div
@@ -37,7 +37,7 @@
           @pointerdown.stop.prevent="startResize($event, h)"
         ></div>
         <div class="tbox-rotate-line"></div>
-        <div class="tbox-rotate-handle" title="Pivoter (Maj : par pas de 15°)" @pointerdown.stop.prevent="startRotate"></div>
+        <div class="tbox-rotate-handle" :title="$t('el.rotate')" @pointerdown.stop.prevent="startRotate"></div>
       </template>
     </div>
   </div>

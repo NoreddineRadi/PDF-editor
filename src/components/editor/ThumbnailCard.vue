@@ -11,18 +11,18 @@
         class="checkbox-btn"
         :class="{ 'checked': pageItem.selected }"
         @click.stop="$emit('toggle-select')"
-        v-tooltip.top="pageItem.selected ? 'Désélectionner' : 'Sélectionner pour extraction'"
+        v-tooltip.top="$t(pageItem.selected ? 'th.deselect' : 'th.selectForExtract')"
       >
         <Check v-if="pageItem.selected" size="12" />
       </button>
 
-      <span class="page-badge">Page {{ displayIndex + 1 }}</span>
+      <span class="page-badge">{{ $t('th.page', { n: displayIndex + 1 }) }}</span>
 
       <div class="card-actions">
         <button 
           type="button" 
           class="action-btn" 
-          v-tooltip.top="'Pivoter'"
+          v-tooltip.top="$t('th.rotate')"
           @click.stop="$emit('rotate')"
         >
           <Refresh size="12" />
@@ -30,7 +30,7 @@
         <button 
           type="button" 
           class="action-btn btn-danger" 
-          v-tooltip.top="'Supprimer'"
+          v-tooltip.top="$t('th.delete')"
           @click.stop="$emit('delete')"
         >
           <Trash size="12" />

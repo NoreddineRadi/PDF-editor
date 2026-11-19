@@ -1,3 +1,12 @@
+# Lot 3 : SEO, multilingue (FR / EN / NL), signature multi-pages, performance
+
+- **Pages statiques par fonctionnalité et par langue** (36 pages : modifier, signer, fusionner, extraire, pivoter, réorganiser, ajouter texte / image, annoter, effacer, confidentialité), générées par `yarn build` (plugin `build/seoPlugin.js`) avec titres, descriptions, canonical, hreflang, Open Graph, JSON-LD, `sitemap.xml`, `robots.txt`. Voir `SEO.md`.
+- **Interface en 3 langues** (`src/i18n`), langue déduite de l'URL, sélecteur dans l'en-tête.
+- **Signature** : appliquer à la page courante, à toutes les pages ou à une plage (`1-3, 5`), en une seule étape d'annulation.
+- **Performance** : pdf.js, pdf-lib et la fenêtre de signature chargés à la demande ; `dvh` mobile ; contenu éditorial en `content-visibility:auto`.
+- **Dons PayPal facultatifs** (`site.config.js`), vérification Search Console / Bing par balise meta.
+- Tests : `yarn test` (4 fichiers).
+
 # Lot 2B : formes, symboles, duplication, calques
 
 - **Formes** (menu ▾ de la barre) : rectangle, carré, cercle, triangle, ligne droite ; couleur, épaisseur, remplissage optionnel. Glisser pour tracer, ou un clic pour une taille par défaut. Redimensionnables et pivotables comme le texte.

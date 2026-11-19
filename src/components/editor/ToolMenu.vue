@@ -25,7 +25,7 @@
             <ToolIcon v-if="item.icon" :name="item.icon" :size="18" />
             <ShapeGraphic v-else :annotation="{ ...item.ann, color: '#e2e8f0', fill: null }" :stroke-px="1.6" />
           </span>
-          <span class="tm-label">{{ item.label }}</span>
+          <span class="tm-label">{{ item.labelKey ? $t(item.labelKey) : item.label }}</span>
         </button>
       </div>
     </Teleport>
@@ -43,7 +43,7 @@ export default {
     icon: { type: String, required: true },
     title: { type: String, default: '' },
     active: { type: Boolean, default: false },
-    items: { type: Array, required: true }, // [{ value, label, ann?, icon?, w?, h? }]
+    items: { type: Array, required: true }, // [{ value, labelKey, ann?, icon?, w?, h? }]
     current: { type: String, default: '' },
   },
   emits: ['select'],

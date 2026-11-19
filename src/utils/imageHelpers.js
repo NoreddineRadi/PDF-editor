@@ -4,6 +4,9 @@
  * Seul le format de sortie (data URL "image/png" ou "image/jpeg") compte pour l'export : pdf-lib ne sait intégrer que ces deux-là.
  */
 
+// Les messages sont traduits à l'affichage (clé i18n portée par l'erreur) : ce module reste sans dépendance
+const imageError = (key) => Object.assign(new Error(key), { i18nKey: key });
+
 export const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 export const MAX_IMAGE_DIMENSION = 2000; // px, sur le plus grand côté
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -12,7 +15,7 @@ function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+    reader.onerror = () => reject(imageError('err.readFile'));
     reader.readAsDataURL(file);
   });
 }
@@ -21,7 +24,7 @@ function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Image illisible ou corrompue.'));
+    img.onerror = () => reject(imageError('err.imageCorrupt'));
     img.src = src;
   });
 }
@@ -32,17 +35,17 @@ function loadImage(src) {
  */
 export async function loadImageFile(file, { maxDim = MAX_IMAGE_DIMENSION } = {}) {
   if (!file || !ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-    throw new Error('Format non pris en charge (PNG, JPG, WebP ou GIF).');
+    throw imageError('err.imageFormat');
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error('Image trop lourde (20 Mo maximum).');
+    throw imageError('err.imageTooBig');
   }
 
   const original = await readAsDataUrl(file);
   const img = await loadImage(original);
   const w0 = img.naturalWidth;
   const h0 = img.naturalHeight;
-  if (!w0 || !h0) throw new Error('Image vide ou illisible.');
+  if (!w0 || !h0) throw imageError('err.imageEmpty');
 
   const isNative = file.type === 'image/png' || file.type === 'image/jpeg';
   if (isNative && Math.max(w0, h0) <= maxDim) {

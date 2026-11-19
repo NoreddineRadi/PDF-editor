@@ -1,11 +1,11 @@
 <template>
   <aside class="app-sidebar" :class="{ 'collapsed': isCollapsed }">
     <div class="sidebar-header">
-      <span v-if="!isCollapsed" class="sidebar-title">Pages ({{ pagesOrder.length }})</span>
+      <span v-if="!isCollapsed" class="sidebar-title">{{ $t('sb.pages', { n: pagesOrder.length }) }}</span>
       <Button 
         class="p-button-text p-button-secondary p-button-sm toggle-btn"
         @click="isCollapsed = !isCollapsed"
-        v-tooltip.right="isCollapsed ? 'Déplier la barre latérale' : 'Replier'"
+        v-tooltip.right="$t(isCollapsed ? 'sb.expand' : 'sb.collapse')"
       >
         <ChevronRight v-if="isCollapsed" size="16" />
         <ChevronLeft v-else size="16" />
@@ -15,12 +15,12 @@
     <!-- Actions de sélection rapide -->
     <div v-if="hasDocument && !isCollapsed" class="selection-tools">
       <Button 
-        label="Tout cocher" 
+        :label="$t('sb.selectAll')" 
         class="p-button-text p-button-sm tool-btn" 
         @click="selectAllPages(true)" 
       />
       <Button 
-        label="Tout décocher" 
+        :label="$t('sb.selectNone')" 
         class="p-button-text p-button-sm tool-btn" 
         @click="selectAllPages(false)" 
       />
@@ -122,6 +122,6 @@ export default {
   padding: 2px 4px !important;
 }
 
-.sidebar-content { flex: 1; overflow-y: auto; padding: 1rem; }
+.sidebar-content { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 1rem; }
 .ghost-thumbnail { opacity: 0.3; border: 2px dashed #2563eb !important; }
 </style>

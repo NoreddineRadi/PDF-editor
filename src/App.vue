@@ -65,7 +65,8 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh; /* mobile : tient compte de la barre d'adresse */
+  width: 100%;
   overflow: hidden;
 }
 

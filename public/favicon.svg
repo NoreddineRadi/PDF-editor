@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PDF Studio">
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  <path d="M18 10h20l10 10v32a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4z" fill="#f8fafc"/>
+  <path d="M38 10v10h10z" fill="#cbd5e1"/>
+  <rect x="14" y="33" width="34" height="13" rx="3" fill="#ef4444"/>
+  <text x="31" y="43.4" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">PDF</text>
+</svg>

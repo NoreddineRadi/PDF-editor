@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
 import { markRaw, toRaw } from 'vue';
 import pdfReaderService from '@/services/pdfReader';
-import { exportPdfBytes, downloadBytes } from '@/services/pdfExporter';
 import { loadImageFile, fitImageBox } from '@/utils/imageHelpers';
 import { reorderList, offsetCopy, nudgePosition } from '@/utils/annotationOrder';
+import { t } from '@/i18n';
 
 const HISTORY_LIMIT = 100;
 const STYLE_KEYS = ['fontSize', 'color', 'strokeWidth', 'fill'];
@@ -104,7 +104,11 @@ export const usePdfStore = defineStore('pdf', {
           { select: true },
         );
       } catch (err) {
-        this.notify('error', 'Image non ajoutée', err?.message || String(err));
+        this.notify(
+          'error',
+          t('err.imageTitle'),
+          err?.i18nKey ? t(err.i18nKey) : err?.message || String(err),
+        );
       }
     },
 
@@ -140,7 +144,7 @@ export const usePdfStore = defineStore('pdf', {
         }
       } catch (err) {
         console.error("Erreur lors de l'ajout des fichiers PDF :", err);
-        this.notify('error', 'Import impossible', 'Impossible de lire ce PDF : ' + (err?.message || err));
+        this.notify('error', t('err.importTitle'), t('err.importDetail', { err: err?.message || err }));
       } finally {
         this.isLoading = false;
       }
@@ -277,6 +281,28 @@ export const usePdfStore = defineStore('pdf', {
       if (select) this.selectedAnnotationId = id;
       return id;
     },
+    /**
+     * Ajoute la même annotation (mêmes coordonnées relatives) sur plusieurs pages, en UNE étape d'historique.
+     * @param {number[]} pageIndexes indices 0-based dans pagesOrder
+     * @returns {number} nombre de pages modifiées
+     */
+    addAnnotationToPages(annotation, pageIndexes) {
+      const targets = [...new Set(pageIndexes)]
+        .map((i) => this.pagesOrder[i])
+        .filter(Boolean);
+      if (!targets.length) return 0;
+      this.pushHistory(null);
+      const current = this.currentPageData;
+      let selectId = null;
+      for (const page of targets) {
+        if (!page.annotations) page.annotations = [];
+        const id = `ann_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        page.annotations.push({ rotation: 0, ...annotation, id });
+        if (page === current) selectId = id;
+      }
+      if (selectId) this.selectedAnnotationId = selectId;
+      return targets.length;
+    },
     /** Fusionne `updated` (doit contenir `id`) dans l'annotation correspondante de la page courante. */
     updateAnnotation(updated, { coalesceKey = null } = {}) {
       const list = this.currentPageData?.annotations;
@@ -378,6 +404,10 @@ export const usePdfStore = defineStore('pdf', {
 
       this.isLoading = true;
       try {
+        // pdf-lib n'est chargé qu'au premier export
+        const { exportPdfBytes, downloadBytes } = await import(
+          '@/services/pdfExporter'
+        );
         const bytes = await exportPdfBytes({
           pagesToExport,
           documents: this.documents,
@@ -385,7 +415,7 @@ export const usePdfStore = defineStore('pdf', {
         downloadBytes(bytes, `pdf_annotated_${Date.now()}.pdf`);
       } catch (err) {
         console.error("Erreur lors de l'exportation du PDF :", err);
-        this.notify('error', 'Export impossible', "Erreur lors de l'exportation : " + (err?.message || err));
+        this.notify('error', t('err.exportTitle'), t('err.exportDetail', { err: err?.message || err }));
       } finally {
         this.isLoading = false;
       }

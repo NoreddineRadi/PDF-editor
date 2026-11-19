@@ -1,10 +1,20 @@
-import * as pdfjsLib from 'pdfjs-dist';
 import { toRaw } from 'vue';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url
-).toString();
+// pdf.js (volumineux) n'est chargé qu'à l'ouverture du premier PDF : la page d'accueil reste légère (Core Web Vitals)
+let pdfjsPromise = null;
+function loadPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import('pdfjs-dist').then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = new URL(
+        'pdfjs-dist/build/pdf.worker.mjs',
+        import.meta.url
+      ).toString();
+      return lib;
+    });
+    pdfjsPromise.catch(() => { pdfjsPromise = null; }); // réseau coupé : on pourra réessayer
+  }
+  return pdfjsPromise;
+}
 
 export default {
   /**
@@ -15,6 +25,7 @@ export default {
     const bytes = rawData instanceof Uint8Array ? rawData : new Uint8Array(rawData);
 
     // .slice(0) évite tout détachement d'ArrayBuffer lors du passage au Worker
+    const pdfjsLib = await loadPdfjs();
     const loadingTask = pdfjsLib.getDocument({
       data: bytes.slice(0)
     });
