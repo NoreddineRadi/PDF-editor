@@ -1,3 +1,11 @@
+# Lot 2B : formes, symboles, duplication, calques
+
+- **Formes** (menu ▾ de la barre) : rectangle, carré, cercle, triangle, ligne droite ; couleur, épaisseur, remplissage optionnel. Glisser pour tracer, ou un clic pour une taille par défaut. Redimensionnables et pivotables comme le texte.
+- **Symboles** : case cochée / décochée, radio coché / décoché, coche ✓, puce •. Un clic pose le symbole (l'outil reste armé, Échap pour quitter).
+- **Export** : formes et symboles sont gravés en vectoriel (chemins PDF, Béziers pour les cercles), rotation de l'élément et de la page comprises. Une seule définition (`src/utils/shapeDefs.js`) sert à l'affichage et à l'export.
+- **Duplication** (Ctrl+D ou bouton), **premier plan / arrière-plan** (boutons de la barre flottante), **flèches** pour déplacer l'élément sélectionné (Maj = 10 px).
+- Tests : `yarn test` (32 tests).
+
 # PDF Studio : correctifs appliqués
 
 Ces fichiers conservent les mêmes chemins que dans votre dépôt : copiez-les par-dessus les vôtres.

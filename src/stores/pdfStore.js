@@ -3,9 +3,10 @@ import { markRaw, toRaw } from 'vue';
 import pdfReaderService from '@/services/pdfReader';
 import { exportPdfBytes, downloadBytes } from '@/services/pdfExporter';
 import { loadImageFile, fitImageBox } from '@/utils/imageHelpers';
+import { reorderList, offsetCopy, nudgePosition } from '@/utils/annotationOrder';
 
 const HISTORY_LIMIT = 100;
-const STYLE_KEYS = ['fontSize', 'color', 'strokeWidth'];
+const STYLE_KEYS = ['fontSize', 'color', 'strokeWidth', 'fill'];
 
 // Outils pour lesquels une sélection reste visible / utilisable
 const SELECTION_TOOLS = ['select', 'text'];
@@ -47,6 +48,9 @@ export const usePdfStore = defineStore('pdf', {
     fontSize: 16,
     highlightColor: '#FFFF00',
     highlightWidth: 20, // surligneur : épaisseur en px de page (indépendante du zoom)
+    shapeKind: 'rect', // 'rect' | 'square' | 'ellipse' | 'circle' | 'triangle' | 'line'
+    shapeFill: null, // null = sans remplissage ; sinon #RRGGBB
+    symbolKind: 'checkbox-checked', // 'checkbox' | 'checkbox-checked' | 'radio' | 'radio-checked' | 'check' | 'bullet'
     maskColor: '#ffffff', // Blanco : blanc par défaut ; 'auto' = couleur du fond de la page ; sinon #RRGGBB
 
     // Historique (annuler / rétablir)
@@ -153,17 +157,31 @@ export const usePdfStore = defineStore('pdf', {
     setAnnotationColor(color) {
       this.annotationColor = color;
       const sel = this.selectedAnnotation;
-      if (sel && (sel.type === 'text' || sel.type === 'drawing'))
+      if (sel && ['text', 'drawing', 'shape', 'symbol'].includes(sel.type))
         this.updateAnnotation({ id: sel.id, color });
     },
     setStrokeWidth(width) {
       this.strokeWidth = width;
       const sel = this.selectedAnnotation;
-      if (sel && sel.type === 'drawing')
+      if (sel && ['drawing', 'shape', 'symbol'].includes(sel.type))
         this.updateAnnotation({
           id: sel.id,
           strokeWidth: width / this.zoomLevel,
         });
+    },
+    setShapeKind(kind) {
+      this.shapeKind = kind;
+      this.setTool('shape');
+    },
+    setSymbolKind(kind) {
+      this.symbolKind = kind;
+      this.setTool('symbol');
+    },
+    setShapeFill(color) {
+      this.shapeFill = color;
+      const sel = this.selectedAnnotation;
+      if (sel && sel.type === 'shape')
+        this.updateAnnotation({ id: sel.id, fill: color });
     },
     setHighlightColor(color) {
       this.highlightColor = color;
@@ -260,7 +278,7 @@ export const usePdfStore = defineStore('pdf', {
       return id;
     },
     /** Fusionne `updated` (doit contenir `id`) dans l'annotation correspondante de la page courante. */
-    updateAnnotation(updated) {
+    updateAnnotation(updated, { coalesceKey = null } = {}) {
       const list = this.currentPageData?.annotations;
       if (!list) return;
       const index = list.findIndex((a) => a.id === updated.id);
@@ -275,9 +293,35 @@ export const usePdfStore = defineStore('pdf', {
       if (changed.every((k) => k === 'text')) key = `text:${old.id}`;
       else if (changed.every((k) => STYLE_KEYS.includes(k)))
         key = `style:${old.id}`;
+      if (!key && coalesceKey) key = coalesceKey;
       this.pushHistory(key);
 
       list[index] = { ...toRaw(old), ...updated };
+    },
+    /** Duplique l'élément (copie décalée, sélectionnée, placée au-dessus). */
+    duplicateAnnotation(id) {
+      const page = this.currentPageData;
+      const src = page?.annotations?.find((a) => a.id === id);
+      if (!src) return null;
+      return this.addAnnotationToCurrentPage(offsetCopy(toRaw(src)), {
+        select: true,
+      });
+    },
+    /** Ordre d'empilement : mode = 'front' | 'back' | 'forward' | 'backward'. */
+    reorderAnnotation(id, mode) {
+      const page = this.currentPageData;
+      if (!page?.annotations) return;
+      const next = reorderList(page.annotations.map((a) => toRaw(a)), id, mode);
+      if (!next) return;
+      this.pushHistory(null);
+      page.annotations = next;
+    },
+    /** Déplacement au clavier (dx, dy en % de la page). Les appuis répétés forment une seule étape d'historique. */
+    nudgeAnnotation(id, dx, dy) {
+      const a = this.currentPageData?.annotations?.find((x) => x.id === id);
+      if (!a) return;
+      const pos = nudgePosition(a, dx, dy);
+      this.updateAnnotation({ id, ...pos }, { coalesceKey: `nudge:${id}` });
     },
     removeAnnotation(id, { history = true } = {}) {
       const page = this.currentPageData;

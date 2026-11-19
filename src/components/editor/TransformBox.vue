@@ -10,6 +10,10 @@
     >
       <slot name="toolbar" />
       <span v-if="$slots.toolbar" class="tbox-sep"></span>
+      <button class="tbox-btn" title="Dupliquer (Ctrl+D)" @click.stop="$emit('duplicate', annotation.id)">⧉</button>
+      <button class="tbox-btn" title="Premier plan" @click.stop="$emit('reorder', annotation.id, 'front')">⤒</button>
+      <button class="tbox-btn" title="Arrière-plan" @click.stop="$emit('reorder', annotation.id, 'back')">⤓</button>
+      <span class="tbox-sep"></span>
       <button class="tbox-btn tbox-danger" title="Supprimer (Suppr)" @click.stop="$emit('delete', annotation.id)">✕</button>
     </div>
 
@@ -68,7 +72,7 @@ export default {
     minHeight: { type: Number, default: 10 },
     passThrough: { type: Boolean, default: false }, // traits : seule la zone tracée capte la souris tant que non sélectionné
   },
-  emits: ["select", "update", "delete"],
+  emits: ["select", "update", "delete", "duplicate", "reorder"],
   data() {
     return {
       live: null, // géométrie en px pendant une interaction (évite de solliciter Pinia à chaque pixel)

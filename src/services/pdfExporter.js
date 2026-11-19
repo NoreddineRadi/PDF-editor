@@ -4,6 +4,19 @@ import {
   LineCapStyle,
   degrees,
   rgb,
+  pushGraphicsState,
+  popGraphicsState,
+  setStrokingColor,
+  setFillingColor,
+  setLineWidth,
+  setLineCap,
+  moveTo,
+  lineTo,
+  appendBezierCurve,
+  closePath,
+  fill,
+  stroke,
+  fillAndStroke,
 } from 'pdf-lib';
 import { buildPageOps } from './annotationOps.js';
 import { normalizeRightAngle } from '../utils/annotationGeometry.js';
@@ -83,6 +96,28 @@ function applyOps(page, ops, { font, images }) {
         opacity: op.opacity,
         borderWidth: 0,
       });
+    } else if (op.kind === 'path') {
+      const operators = [pushGraphicsState()];
+      if (op.stroke) {
+        operators.push(
+          setStrokingColor(hexToPdfRgb(op.stroke)),
+          setLineWidth(op.strokeWidth),
+          setLineCap(LineCapStyle.Round),
+        );
+      }
+      if (op.fill) operators.push(setFillingColor(hexToPdfRgb(op.fill)));
+      for (const c of op.cmds) {
+        if (c[0] === 'M') operators.push(moveTo(c[1], c[2]));
+        else if (c[0] === 'L') operators.push(lineTo(c[1], c[2]));
+        else if (c[0] === 'C')
+          operators.push(appendBezierCurve(c[1], c[2], c[3], c[4], c[5], c[6]));
+        else if (c[0] === 'Z') operators.push(closePath());
+      }
+      if (op.fill && op.stroke) operators.push(fillAndStroke());
+      else if (op.fill) operators.push(fill());
+      else operators.push(stroke());
+      operators.push(popGraphicsState());
+      page.pushOperators(...operators);
     } else if (op.kind === 'image') {
       const img = images.get(op.src);
       if (!img) continue;

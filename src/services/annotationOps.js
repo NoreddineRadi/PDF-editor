@@ -7,6 +7,7 @@
  * On calcule donc ce coin visuel après rotation, puis on applique l'angle (R - rotation) à pdf-lib.
  */
 import { localToView, viewToUser } from "../utils/annotationGeometry.js";
+import { getPrimitives, resolvePaint } from "../utils/shapeDefs.js";
 
 export const TEXT_PAD_X = 6; // doit rester identique au padding du textarea (en pt, il suit le zoom)
 export const TEXT_PAD_Y = 4;
@@ -79,6 +80,28 @@ export function buildPageOps(annotations, { W, H, R, origin = { x: 0, y: 0 } }, 
       const offY = (bh - dh) / 2;
       const o = toUser(ann, offX, offY + dh); // coin bas-gauche visuel de l'image
       ops.push({ kind: "image", src: ann.dataUrl, x: o.x, y: o.y, width: dw, height: dh, rotateDeg: angle(ann) });
+    } else if (ann.type === "shape" || ann.type === "symbol") {
+      // Même définition que l'affichage (shapeDefs) ; l'affine (rotation, page) conserve les Béziers
+      for (const prim of getPrimitives(ann)) {
+        const paint = resolvePaint(prim, ann);
+        if (!paint.fill && !paint.stroke) continue;
+        const cmds = prim.segs.map((s) => {
+          if (s[0] === "Z") return ["Z"];
+          const out = [s[0]];
+          for (let i = 1; i < s.length; i += 2) {
+            const p = toUser(ann, s[i] * bw, s[i + 1] * bh);
+            out.push(p.x, p.y);
+          }
+          return out;
+        });
+        ops.push({
+          kind: "path",
+          cmds,
+          fill: paint.fill,
+          stroke: paint.stroke,
+          strokeWidth: ann.strokeWidth || 2,
+        });
+      }
     } else if (ann.type === "mask") {
       const o = toUser(ann, 0, bh);
       ops.push({

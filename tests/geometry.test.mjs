@@ -5,6 +5,8 @@ import {
 } from "../src/utils/annotationGeometry.js";
 import { buildPageOps } from "../src/services/annotationOps.js";
 import { fitImageBox } from "../src/utils/imageHelpers.js";
+import { getPrimitives, flattenSegs, segsToSvgPath } from "../src/utils/shapeDefs.js";
+import { reorderList, offsetCopy, nudgePosition } from "../src/utils/annotationOrder.js";
 import { describeBuild } from "../src/utils/appInfo.js";
 
 let passed = 0;
@@ -170,6 +172,83 @@ test("barre flottante : bascule de côté quand la page n'a pas la place", () =>
   const nearBottom = placeToolbar({ cy: 960, w: 200, h: 80, rot: 0, pageHeight: 1000 });
   assert.equal(nearBottom.side, "above");
   assert.ok(nearBottom.top < -(40 + 37)); // au-delà de la poignée (elle est au-dessus)
+});
+
+const rectShape = { type: "shape", shape: "rect", ...box, rotation: 0, color: "#ff0000", fill: null, strokeWidth: 3 };
+
+test("forme rect : chemin exporté (rotation 0, page 0)", () => {
+  const ops = buildPageOps([rectShape], { W, H, R: 0 });
+  assert.equal(ops.length, 1);
+  const [op] = ops;
+  assert.equal(op.kind, "path"); assert.equal(op.fill, null); assert.equal(op.stroke, "#ff0000"); assert.equal(op.strokeWidth, 3);
+  assert.deepEqual(op.cmds.map((c) => c[0]), ["M", "L", "L", "L", "Z"]);
+  near(op.cmds[0][1], 60); near(op.cmds[0][2], 640);
+  near(op.cmds[1][1], 240); near(op.cmds[1][2], 640);
+  near(op.cmds[3][1], 60); near(op.cmds[3][2], 560);
+});
+
+test("forme tournée de 90° : coin haut-gauche -> haut-droite (vue) -> espace PDF", () => {
+  const [op] = buildPageOps([{ ...rectShape, rotation: 90 }], { W, H, R: 0 });
+  // vue : (190,110) -> utilisateur (190, 690)
+  near(op.cmds[0][1], 190); near(op.cmds[0][2], 690);
+});
+
+test("forme sur une page tournée : mêmes règles que le texte", () => {
+  const [op] = buildPageOps([rectShape], { W, H, R: 90 });
+  // page 90° : vue 800x600, coin de la boîte en (80,120) -> fx=.1, fy=.2 -> utilisateur (fy*W, fx*H)
+  near(op.cmds[0][1], 120); near(op.cmds[0][2], 80);
+});
+
+test("cercle : 4 Béziers, remplissage seulement si défini", () => {
+  const circle = { ...rectShape, shape: "ellipse", fill: "#00ff00" };
+  const [op] = buildPageOps([circle], { W, H, R: 0 });
+  assert.equal(op.cmds.filter((c) => c[0] === "C").length, 4);
+  assert.equal(op.fill, "#00ff00");
+});
+
+test("symboles : case cochée = 2 chemins ; radio cochée = point plein ; puce pleine sans contour", () => {
+  const base = { type: "symbol", x: 10, y: 10, width: 4, height: 3, rotation: 0, color: "#000000", strokeWidth: 2 };
+  assert.equal(buildPageOps([{ ...base, symbol: "checkbox" }], { W, H, R: 0 }).length, 1);
+  assert.equal(buildPageOps([{ ...base, symbol: "checkbox-checked" }], { W, H, R: 0 }).length, 2);
+  const radio = buildPageOps([{ ...base, symbol: "radio-checked" }], { W, H, R: 0 });
+  assert.equal(radio.length, 2); assert.equal(radio[1].fill, "#000000"); assert.equal(radio[1].stroke, null);
+  const [bullet] = buildPageOps([{ ...base, symbol: "bullet" }], { W, H, R: 0 });
+  assert.equal(bullet.fill, "#000000"); assert.equal(bullet.stroke, null);
+});
+
+test("shapeDefs : chemin SVG et aplatissement", () => {
+  const [p] = getPrimitives(rectShape);
+  assert.equal(segsToSvgPath(p.segs), "M 0 0 L 1 0 L 1 1 L 0 1 Z");
+  const [e] = getPrimitives({ ...rectShape, shape: "ellipse" });
+  const poly = flattenSegs(e.segs)[0];
+  for (const [x, y] of poly.pts) near(Math.hypot(x - 0.5, y - 0.5), 0.5, 0.002);
+});
+
+test("hitTest forme : vide au centre, touché sur le bord ; plein touché au centre", () => {
+  // centre de la boîte = (150, 200)
+  assert.equal(hitTest(rectShape, 150, 200, W, H), false);
+  assert.equal(hitTest(rectShape, 60, 200, W, H), true);
+  assert.equal(hitTest({ ...rectShape, fill: "#00ff00" }, 150, 200, W, H), true);
+  assert.equal(hitTest(rectShape, 400, 400, W, H), false);
+});
+
+test("z-order : reorderList", () => {
+  const l = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  assert.deepEqual(reorderList(l, "a", "front").map((x) => x.id), ["b", "c", "a"]);
+  assert.deepEqual(reorderList(l, "c", "back").map((x) => x.id), ["c", "a", "b"]);
+  assert.deepEqual(reorderList(l, "a", "forward").map((x) => x.id), ["b", "a", "c"]);
+  assert.deepEqual(reorderList(l, "c", "backward").map((x) => x.id), ["a", "c", "b"]);
+  assert.equal(reorderList(l, "c", "front"), null);
+  assert.equal(reorderList(l, "a", "back"), null);
+  assert.equal(reorderList(l, "zz", "front"), null);
+});
+
+test("duplication et déplacement clavier", () => {
+  const a = { x: 10, y: 10, width: 20, height: 10 };
+  const c = offsetCopy(a); near(c.x, 12); near(c.y, 12);
+  const edge = offsetCopy({ x: 79, y: 89, width: 20, height: 10 }); near(edge.x, 77); near(edge.y, 87);
+  const n = nudgePosition(a, 1, -1); near(n.x, 11); near(n.y, 9);
+  const out = nudgePosition({ x: 90, y: 0, width: 20, height: 10 }, 50, -50); near(out.x + 10, 100); near(out.y + 5, 0);
 });
 
 console.log(`\n${passed} tests OK`);

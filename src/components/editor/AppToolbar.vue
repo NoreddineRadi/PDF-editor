@@ -105,6 +105,22 @@
           >
             <ToolIcon name="image" />
           </Button>
+          <ToolMenu
+            icon="shapes"
+            title="Formes : rectangle, carré, cercle, triangle, ligne"
+            :active="activeTool === 'shape'"
+            :items="shapeItems"
+            :current="shapeKind"
+            @select="setShapeKind"
+          />
+          <ToolMenu
+            icon="symbols"
+            title="Symboles : cases à cocher, boutons radio, coche, puce (clic pour poser)"
+            :active="activeTool === 'symbol'"
+            :items="symbolItems"
+            :current="symbolKind"
+            @select="setSymbolKind"
+          />
           <Button
             class="p-button-text header-icon-btn signature-btn"
             @click="openSignatureModal"
@@ -168,6 +184,24 @@
             <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur du masque'">
               <input type="color" :value="maskColorValue" @input="(e) => setMaskColor(e.target.value)" class="color-picker-input" />
             </div>
+          </template>
+
+          <!-- Formes et symboles -->
+          <template v-else-if="styleContext === 'shape' || styleContext === 'symbol'">
+            <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur du contour'">
+              <input type="color" :value="annotationColor" @input="(e) => setAnnotationColor(e.target.value)" class="color-picker-input" />
+            </div>
+            <select :value="strokeWidthValue" @change="onStrokeWidthChange" class="stroke-select">
+              <option v-for="w in strokeOptions" :key="w.value" :value="w.value">{{ w.label }}</option>
+            </select>
+            <template v-if="styleContext === 'shape' && !isLineKind">
+              <span class="style-sep"></span>
+              <button class="preset-btn" :class="{ active: !fillValue }" title="Sans remplissage" @click="setShapeFill(null)">Vide</button>
+              <button class="preset-btn" :class="{ active: !!fillValue }" title="Remplir la forme" @click="setShapeFill(fillValue || fillPickerValue)">Plein</button>
+              <div class="color-picker-wrapper" v-tooltip.bottom="'Couleur de remplissage'">
+                <input type="color" :value="fillPickerValue" @input="(e) => setShapeFill(e.target.value)" class="color-picker-input" />
+              </div>
+            </template>
           </template>
 
           <!-- Crayon / texte -->
@@ -265,18 +299,34 @@ import { mapState, mapActions } from 'pinia';
 import { usePdfStore } from '@/stores/pdfStore';
 import SignatureModal from './SignatureModal.vue';
 import ToolIcon from './ToolIcon.vue';
+import ToolMenu from './ToolMenu.vue';
 import Button from 'primevue/button';
 import { appInfo, describeBuild } from '@/utils/appInfo';
 
 export default {
   name: 'AppToolbar',
-  components: { Button, SignatureModal, ToolIcon },
+  components: { Button, SignatureModal, ToolIcon, ToolMenu },
   data() {
     return {
       showSigModal: false,
       appVersion: appInfo.version,
       appCommit: appInfo.commit,
       buildInfo: describeBuild(),
+      shapeItems: [
+        { value: 'rect', label: 'Rectangle', ann: { type: 'shape', shape: 'rect' }, w: 22, h: 14 },
+        { value: 'square', label: 'Carré', ann: { type: 'shape', shape: 'rect' } },
+        { value: 'circle', label: 'Cercle', ann: { type: 'shape', shape: 'ellipse' } },
+        { value: 'triangle', label: 'Triangle', ann: { type: 'shape', shape: 'triangle' } },
+        { value: 'line', label: 'Ligne droite', icon: 'line' }
+      ],
+      symbolItems: [
+        { value: 'checkbox', label: 'Case décochée', ann: { type: 'symbol', symbol: 'checkbox' } },
+        { value: 'checkbox-checked', label: 'Case cochée', ann: { type: 'symbol', symbol: 'checkbox-checked' } },
+        { value: 'radio', label: 'Radio décoché', ann: { type: 'symbol', symbol: 'radio' } },
+        { value: 'radio-checked', label: 'Radio coché', ann: { type: 'symbol', symbol: 'radio-checked' } },
+        { value: 'check', label: 'Coche ✓', ann: { type: 'symbol', symbol: 'check' } },
+        { value: 'bullet', label: 'Puce •', ann: { type: 'symbol', symbol: 'bullet' } }
+      ],
       highlightPalette: ['#FFFF00', '#7CFC00', '#FF8DC7', '#FFA500', '#4FC3F7'],
       highlightPresets: [
         { label: 'S', value: 10, title: 'Fin (10 px)' },
@@ -289,21 +339,48 @@ export default {
     ...mapState(usePdfStore, [
       'hasDocument', 'currentPage', 'pageCount',
       'hasSelection', 'selectedCount', 'activeTool', 'annotationColor',
-      'strokeWidth', 'highlightColor', 'highlightWidth', 'maskColor',
+      'zoomLevel', 'strokeWidth', 'shapeKind', 'shapeFill', 'symbolKind', 'highlightColor', 'highlightWidth', 'maskColor',
       'selectedAnnotation', 'canUndo', 'canRedo'
     ]),
 
     // Quel panneau de réglages afficher ? Dépend de l'outil actif, sinon de l'élément sélectionné.
     styleContext() {
       const tool = this.activeTool;
-      if (tool === 'highlight' || tool === 'mask' || tool === 'draw' || tool === 'text') return tool;
+      if (tool === 'highlight' || tool === 'mask' || tool === 'draw' || tool === 'text' || tool === 'shape' || tool === 'symbol') return tool;
       if (tool === 'eraser') return null;
       const type = this.selectedAnnotation?.type;
       if (type === 'highlight') return 'highlight';
       if (type === 'mask') return 'mask';
       if (type === 'drawing') return 'draw';
       if (type === 'text') return 'text';
+      if (type === 'shape' || type === 'symbol') return type;
       return null;
+    },
+
+    // Formes / symboles : valeurs de l'élément sélectionné, sinon réglages de l'outil
+    selectedShape() {
+      const a = this.selectedAnnotation;
+      return a && (a.type === 'shape' || a.type === 'symbol') && this.activeTool === 'select' ? a : null;
+    },
+    isLineKind() {
+      return this.activeTool === 'shape' && this.shapeKind === 'line';
+    },
+    fillValue() {
+      return this.selectedShape ? this.selectedShape.fill || null : this.shapeFill;
+    },
+    fillPickerValue() {
+      return this.fillValue || '#ffff00';
+    },
+    // Épaisseur affichée en px écran (stockée en points PDF)
+    strokeWidthValue() {
+      const a = this.selectedShape;
+      return a ? Math.round((a.strokeWidth || 2) * this.zoomLevel) : this.strokeWidth;
+    },
+    strokeOptions() {
+      const base = [1, 2, 3, 4, 6, 8];
+      const cur = this.strokeWidthValue;
+      const opts = base.includes(cur) ? base : [...base, cur].sort((x, y) => x - y);
+      return opts.map((v) => ({ value: v, label: `${v} px` }));
     },
 
     // Valeurs affichées : celles de l'élément sélectionné s'il y en a un, sinon les réglages de l'outil
@@ -336,7 +413,7 @@ export default {
   methods: {
     ...mapActions(usePdfStore, [
       'addFiles', 'setPage', 'exportPdf', 'clearAll', 'setTool',
-      'setAnnotationColor', 'setStrokeWidth', 'setHighlightColor', 'setHighlightWidth', 'setMaskColor',
+      'setAnnotationColor', 'setStrokeWidth', 'setShapeKind', 'setSymbolKind', 'setShapeFill', 'setHighlightColor', 'setHighlightWidth', 'setMaskColor',
       'undo', 'redo', 'addAnnotationToCurrentPage', 'addImageFromFile'
     ]),
     triggerFileSelect() { this.$refs.fileInput.click(); },

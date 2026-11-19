@@ -9,6 +9,8 @@
  * "Utilisateur" = espace PDF (origine en bas à gauche, avant application de /Rotate).
  */
 
+import { getPrimitives, resolvePaint, flattenSegs } from "./shapeDefs.js";
+
 export const toRad = (deg) => (deg * Math.PI) / 180;
 export const normalizeDeg = (deg) => ((deg % 360) + 360) % 360;
 export const normalizeRightAngle = (deg) => normalizeDeg(Math.round(deg / 90) * 90);
@@ -70,6 +72,16 @@ export function distToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
+export function pointInPolygon(x, y, P) {
+  let inside = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [xi, yi] = P[i];
+    const [xj, yj] = P[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 /** Le point (X, Y) de la vue touche-t-il l'annotation ? (utilisé par la gomme) */
 export function hitTest(ann, X, Y, vw, vh, zoom = 1) {
   const l = viewToLocal(ann, X, Y, vw, vh);
@@ -83,6 +95,26 @@ export function hitTest(ann, X, Y, vw, vh, zoom = 1) {
     for (let i = 0; i < pts.length - 1; i++) {
       const d = distToSegment(l.x, l.y, pts[i].x * b.w, pts[i].y * b.h, pts[i + 1].x * b.w, pts[i + 1].y * b.h);
       if (d <= tol) return true;
+    }
+    return false;
+  }
+
+  if (ann.type === "shape" || ann.type === "symbol") {
+    const tol = Math.max(((ann.strokeWidth || 2) * zoom) / 2, 2) + 5;
+    const insideOnly = ann.type === "symbol"; // les symboles restent faciles à attraper (boîte)
+    if (insideOnly) return l.x >= -2 && l.x <= b.w + 2 && l.y >= -2 && l.y <= b.h + 2;
+    for (const prim of getPrimitives(ann)) {
+      const paint = resolvePaint(prim, ann);
+      for (const poly of flattenSegs(prim.segs)) {
+        const P = poly.pts.map((q) => [q[0] * b.w, q[1] * b.h]);
+        if (paint.fill && pointInPolygon(l.x, l.y, P)) return true;
+        const n = poly.closed ? P.length : P.length - 1;
+        for (let i = 0; i < n; i++) {
+          const a = P[i];
+          const c = P[(i + 1) % P.length];
+          if (distToSegment(l.x, l.y, a[0], a[1], c[0], c[1]) <= tol) return true;
+        }
+      }
     }
     return false;
   }

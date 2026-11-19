@@ -21,7 +21,14 @@
       @select="selectAnnotation(anno.id)"
       @update="(patch) => updateAnnotation({ ...patch, id: anno.id })"
       @delete="removeAnnotation(anno.id)"
+      @duplicate="duplicateAnnotation(anno.id)"
+      @reorder="(id, mode) => reorderAnnotation(anno.id, mode)"
     />
+
+    <!-- Aperçu de la forme en cours de tracé -->
+    <div v-if="shapePreview" class="shape-preview" :style="shapePreview.style">
+      <ShapeGraphic :annotation="shapePreview.ann" :stroke-px="strokeWidth || 3" />
+    </div>
 
     <!-- Aperçu en direct : trait en cours, rectangle de masque -->
     <svg class="live-layer" :viewBox="`0 0 ${effectiveWidth} ${effectiveHeight}`" preserveAspectRatio="none">
@@ -57,6 +64,8 @@ import TextAnnotationOverlay from "./TextAnnotationOverlay.vue";
 import SignatureAnnotationOverlay from "./SignatureAnnotationOverlay.vue";
 import StrokeAnnotation from "./StrokeAnnotation.vue";
 import MaskAnnotation from "./MaskAnnotation.vue";
+import ShapeAnnotation from "./ShapeAnnotation.vue";
+import ShapeGraphic from "./ShapeGraphic.vue";
 import { buildStrokeAnnotation, hitTest, pointsToPath, sampleBackground } from "@/utils/annotationGeometry";
 
 // Type d'annotation -> composant d'affichage (ajouter un type = ajouter une ligne ici)
@@ -67,14 +76,20 @@ const COMPONENTS = {
   drawing: "StrokeAnnotation",
   highlight: "StrokeAnnotation",
   mask: "MaskAnnotation",
+  shape: "ShapeAnnotation",
+  symbol: "ShapeAnnotation",
 };
 
 // Outils qui captent le pointeur sur toute la page (les éléments existants deviennent "transparents")
-const POINTER_TOOLS = ["draw", "highlight", "mask", "eraser"];
+const POINTER_TOOLS = ["draw", "highlight", "mask", "eraser", "shape", "symbol"];
+
+// Taille par défaut des éléments posés d'un simple clic (px à zoom 100 %)
+const SYMBOL_SIZE = 24;
+const DEFAULT_SHAPE = { w: 120, h: 80, side: 90 };
 
 export default {
   name: "AnnotationLayer",
-  components: { TextAnnotationOverlay, SignatureAnnotationOverlay, StrokeAnnotation, MaskAnnotation },
+  components: { TextAnnotationOverlay, SignatureAnnotationOverlay, StrokeAnnotation, MaskAnnotation, ShapeAnnotation, ShapeGraphic },
   props: {
     width: { type: Number, default: 0 },
     height: { type: Number, default: 0 },
@@ -89,6 +104,7 @@ export default {
       pointerActive: false,
       livePoints: [], // crayon / surligneur en cours (px)
       rubber: null, // rectangle de masque en cours (px)
+      shapeDrag: null, // forme en cours de tracé (px)
       lastErase: null,
     };
   },
@@ -102,6 +118,9 @@ export default {
       "highlightColor",
       "highlightWidth",
       "maskColor",
+      "shapeKind",
+      "shapeFill",
+      "symbolKind",
       "selectedAnnotationId",
     ]),
 
@@ -123,6 +142,8 @@ export default {
         "tool-highlight": this.activeTool === "highlight",
         "tool-mask": this.activeTool === "mask",
         "tool-eraser": this.activeTool === "eraser",
+        "tool-shape": this.activeTool === "shape",
+        "tool-symbol": this.activeTool === "symbol",
         "tool-text": this.activeTool === "text",
       };
     },
@@ -136,6 +157,20 @@ export default {
         return { color: this.highlightColor, width: this.highlightWidth * this.zoomLevel, opacity: 0.35 };
       }
       return { color: this.annotationColor || "#000000", width: this.strokeWidth || 3, opacity: 1 };
+    },
+    shapePreview() {
+      const d = this.shapeDrag;
+      if (!d) return null;
+      const r = this.shapeRect(d);
+      return {
+        style: { left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px" },
+        ann: {
+          type: "shape",
+          shape: this.shapeKind === "square" ? "rect" : this.shapeKind === "circle" ? "ellipse" : this.shapeKind,
+          color: this.annotationColor || "#000000",
+          fill: this.shapeFill,
+        },
+      };
     },
     rubberRect() {
       if (!this.rubber) return null;
@@ -169,6 +204,9 @@ export default {
       "selectAnnotation",
       "undo",
       "redo",
+      "duplicateAnnotation",
+      "reorderAnnotation",
+      "nudgeAnnotation",
       "beginHistoryGroup",
       "endHistoryGroup",
     ]),
@@ -197,9 +235,14 @@ export default {
       if (e.button !== undefined && e.button !== 0) return;
       e.preventDefault();
 
-      this.pointerActive = true;
       this.selectAnnotation(null);
       const p = this.getPoint(e);
+
+      if (this.activeTool === "symbol") {
+        this.placeSymbol(p); // pose immédiate ; l'outil reste armé pour en poser d'autres (Échap pour quitter)
+        return;
+      }
+      this.pointerActive = true;
 
       if (this.activeTool === "draw") {
         this.livePoints = [p];
@@ -208,6 +251,9 @@ export default {
         this.livePoints = [p, { ...p }];
       } else if (this.activeTool === "mask") {
         this.rubber = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+      } else if (this.activeTool === "shape") {
+        if (this.shapeKind === "line") this.livePoints = [p, { ...p }];
+        else this.shapeDrag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
       } else if (this.activeTool === "eraser") {
         this.beginHistoryGroup();
         this.lastErase = p;
@@ -232,6 +278,12 @@ export default {
       } else if (this.activeTool === "mask" && this.rubber) {
         this.rubber.x1 = p.x;
         this.rubber.y1 = p.y;
+      } else if (this.activeTool === "shape") {
+        if (this.shapeKind === "line") this.livePoints[1] = p;
+        else if (this.shapeDrag) {
+          this.shapeDrag.x1 = p.x;
+          this.shapeDrag.y1 = p.y;
+        }
       } else if (this.activeTool === "eraser") {
         this.eraseSegment(this.lastErase, p);
         this.lastErase = p;
@@ -246,12 +298,14 @@ export default {
       if (tool === "draw") this.finishDraw();
       else if (tool === "highlight") this.finishHighlight();
       else if (tool === "mask") this.finishMask();
+      else if (tool === "shape") this.finishShape();
       else if (tool === "eraser") {
         this.endHistoryGroup();
         this.lastErase = null;
       }
       this.livePoints = [];
       this.rubber = null;
+      this.shapeDrag = null;
       try {
         this.$refs.layerRef.releasePointerCapture(e.pointerId);
       } catch (_) {
@@ -305,6 +359,88 @@ export default {
         height: (r.h / this.effectiveHeight) * 100,
         rotation: 0,
         color,
+      });
+    },
+
+    /* Rectangle d'une forme en cours : carré / cercle = proportions verrouillées */
+    shapeRect(d) {
+      let dx = d.x1 - d.x0;
+      let dy = d.y1 - d.y0;
+      if (this.shapeKind === "square" || this.shapeKind === "circle") {
+        const m = Math.max(Math.abs(dx), Math.abs(dy));
+        dx = Math.sign(dx || 1) * m;
+        dy = Math.sign(dy || 1) * m;
+      }
+      return { x: Math.min(d.x0, d.x0 + dx), y: Math.min(d.y0, d.y0 + dy), w: Math.abs(dx), h: Math.abs(dy) };
+    },
+
+    finishShape() {
+      const strokePt = (this.strokeWidth || 3) / this.zoomLevel;
+      const color = this.annotationColor || "#000000";
+      const kind = this.shapeKind;
+
+      if (kind === "line") {
+        let [a, b] = this.livePoints;
+        if (!a || !b) return;
+        if (Math.hypot(b.x - a.x, b.y - a.y) < 4) b = { x: a.x + DEFAULT_SHAPE.w * this.zoomLevel, y: a.y }; // simple clic : ligne par défaut
+        this.addAnnotationToCurrentPage(
+          buildStrokeAnnotation([a, b], {
+            pageW: this.effectiveWidth,
+            pageH: this.effectiveHeight,
+            zoom: this.zoomLevel,
+            strokePt,
+            type: "drawing",
+            color,
+          }),
+          { select: true }
+        );
+      } else {
+        const d = this.shapeDrag;
+        if (!d) return;
+        let r = this.shapeRect(d);
+        if (r.w < 6 && r.h < 6) {
+          // simple clic : forme de taille par défaut centrée sur le clic
+          const z = this.zoomLevel;
+          const sq = kind === "square" || kind === "circle";
+          const w = (sq ? DEFAULT_SHAPE.side : DEFAULT_SHAPE.w) * z;
+          const h = (sq ? DEFAULT_SHAPE.side : DEFAULT_SHAPE.h) * z;
+          r = { x: d.x0 - w / 2, y: d.y0 - h / 2, w, h };
+        }
+        const x = Math.max(0, Math.min(r.x, this.effectiveWidth - r.w));
+        const y = Math.max(0, Math.min(r.y, this.effectiveHeight - r.h));
+        this.addAnnotationToCurrentPage(
+          {
+            type: "shape",
+            shape: kind === "square" ? "rect" : kind === "circle" ? "ellipse" : kind,
+            x: (x / this.effectiveWidth) * 100,
+            y: (y / this.effectiveHeight) * 100,
+            width: (r.w / this.effectiveWidth) * 100,
+            height: (r.h / this.effectiveHeight) * 100,
+            rotation: 0,
+            color,
+            fill: this.shapeFill,
+            strokeWidth: strokePt,
+          },
+          { select: true }
+        );
+      }
+      this.setTool("select"); // une forme à la fois ; "select" conserve la sélection
+    },
+
+    placeSymbol(p) {
+      const size = SYMBOL_SIZE * this.zoomLevel;
+      const x = Math.max(0, Math.min(p.x - size / 2, this.effectiveWidth - size));
+      const y = Math.max(0, Math.min(p.y - size / 2, this.effectiveHeight - size));
+      this.addAnnotationToCurrentPage({
+        type: "symbol",
+        symbol: this.symbolKind,
+        x: (x / this.effectiveWidth) * 100,
+        y: (y / this.effectiveHeight) * 100,
+        width: (size / this.effectiveWidth) * 100,
+        height: (size / this.effectiveHeight) * 100,
+        rotation: 0,
+        color: this.annotationColor || "#000000",
+        strokeWidth: 2,
       });
     },
 
@@ -372,6 +508,19 @@ export default {
       if ((e.key === "Delete" || e.key === "Backspace") && this.selectedAnnotationId) {
         e.preventDefault();
         this.removeAnnotation(this.selectedAnnotationId);
+      } else if (mod && key === "d" && this.selectedAnnotationId) {
+        e.preventDefault(); // évite "ajouter aux favoris"
+        this.duplicateAnnotation(this.selectedAnnotationId);
+      } else if (this.selectedAnnotationId && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1; // px
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        this.nudgeAnnotation(
+          this.selectedAnnotationId,
+          (dx / this.effectiveWidth) * 100,
+          (dy / this.effectiveHeight) * 100
+        );
       } else if (mod && !e.shiftKey && key === "z") {
         e.preventDefault();
         this.undo();
@@ -421,9 +570,18 @@ export default {
   pointer-events: none !important;
 }
 
+.shape-preview {
+  position: absolute;
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
 .tool-draw,
 .tool-highlight,
-.tool-mask {
+.tool-mask,
+.tool-shape,
+.tool-symbol {
   cursor: crosshair;
 }
 .tool-text {
