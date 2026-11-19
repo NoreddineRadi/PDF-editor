@@ -6,7 +6,7 @@
 export default {
   // Adresse publique du site, sans "/" final. OBLIGATOIRE pour : canonical, hreflang, sitemap.xml, Open Graph.
   // Exemple : 'https://pdf.mondomaine.com'   (variable : VITE_SITE_URL)
-  siteUrl: '',
+  siteUrl: 'https://free-apps.duckdns.org/pdf-editor',
 
   // Lien de don PayPal (facultatif ; https obligatoire). Vide = aucun bouton de don affiché.
   // Exemples : 'https://paypal.me/monpseudo'  ou  'https://www.paypal.com/donate/?hosted_button_id=XXXX'   (variable : VITE_PAYPAL_URL)

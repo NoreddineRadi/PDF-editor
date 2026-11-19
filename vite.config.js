@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env };
   const seo = resolveSeoConfig(siteConfig, env);
   return {
-    base: env.VITE_BASE_URL || '/pdf-editor/',
+    base: env.VITE_BASE_URL || '',
     plugins: [vue(), seoPlugin(seo)],
     define: {
       __DONATE_URL__: JSON.stringify(seo.paypalUrl),
