@@ -33,46 +33,47 @@ export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env };
   const seo = resolveSeoConfig(siteConfig, env);
   return {
-  plugins: [vue(), seoPlugin(seo)],
-  define: {
-    __DONATE_URL__: JSON.stringify(seo.paypalUrl),
-    __APP_VERSION__: JSON.stringify(pkg.version),
-    __APP_COMMIT__: JSON.stringify(resolveCommit()),
-    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
-  },
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    base: env.VITE_BASE_URL || '/pdf-editor/',
+    plugins: [vue(), seoPlugin(seo)],
+    define: {
+      __DONATE_URL__: JSON.stringify(seo.paypalUrl),
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __APP_COMMIT__: JSON.stringify(resolveCommit()),
+      __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
     },
-  },
-  optimizeDeps: {
-    include: ['pdfjs-dist'],
-    esbuildOptions: { target: 'esnext' },
-  },
-  build: {
-    // pdfjs-dist (v4+) utilise le top-level await : 'es2020' fait échouer le build
-    target: 'es2022',
-    chunkSizeWarningLimit: 900,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('pdf-lib')) return 'pdf-lib';
-            if (id.includes('pdfjs-dist') || id.includes('pdf.worker'))
-              return 'pdfjs';
-            if (id.includes('primevue') || id.includes('primeicons'))
-              return 'primevue';
-            if (
-              id.includes('vue') ||
-              id.includes('pinia') ||
-              id.includes('vue-router')
-            )
-              return 'vue-vendor';
-            return 'vendor';
-          }
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
+    optimizeDeps: {
+      include: ['pdfjs-dist'],
+      esbuildOptions: { target: 'esnext' },
+    },
+    build: {
+      // pdfjs-dist (v4+) utilise le top-level await : 'es2020' fait échouer le build
+      target: 'es2022',
+      chunkSizeWarningLimit: 900,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('pdf-lib')) return 'pdf-lib';
+              if (id.includes('pdfjs-dist') || id.includes('pdf.worker'))
+                return 'pdfjs';
+              if (id.includes('primevue') || id.includes('primeicons'))
+                return 'primevue';
+              if (
+                id.includes('vue') ||
+                id.includes('pinia') ||
+                id.includes('vue-router')
+              )
+                return 'vue-vendor';
+              return 'vendor';
+            }
+          },
         },
       },
     },
-  },
-};
+  };
 });
