@@ -22,6 +22,7 @@
         </Button>
         <p class="dropzone-privacy">{{ $t('vw.privacy') }}</p>
         <a class="dropzone-guide" href="#seo-content">{{ $t('vw.guide') }} ↓</a>
+        <DonateCard compact class="dropzone-donate" />
       </div>
     </div>
 
@@ -42,10 +43,12 @@ import pdfReaderService from "@/services/pdfReader";
 import ProgressSpinner from "primevue/progressspinner";
 import Button from "primevue/button";
 import AnnotationLayer from "./AnnotationLayer.vue";
+import DonateCard from "./DonateCard.vue";
 
 export default {
   name: "PdfViewer",
   components: {
+    DonateCard,
     ProgressSpinner,
     Button,
     AnnotationLayer,
@@ -281,6 +284,9 @@ export default {
   margin: 0 0 0.5rem 0;
 }
 
+.dropzone-donate {
+  margin: 1.25rem auto 0;
+}
 .dropzone-guide {
   display: inline-block;
   margin-top: 0.75rem;

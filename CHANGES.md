@@ -1,3 +1,10 @@
+# Lot 4 : déploiement en sous-dossier et don PayPal (QR code)
+
+- **Correctif 404 /manifest.webmanifest** : tous les chemins racine (manifest, favicon, apple-touch-icon, liens internes des pages SEO) passent par une base unique (`normalizeBase` / `withBase`), déduite de `siteUrl` si `VITE_BASE_URL` manque. Le manifest est généré avec `start_url`, `scope` et icônes préfixés.
+- `resolveRoute` ne dépend plus de `import.meta.env` (tests Node à nouveau valides) et ne retire que le préfixe en tête de chemin.
+- **Don PayPal** : `DonateCard` (QR + bouton, masqué sur mobile), panneau ♥ dans l'en-tête, carte compacte sur l'écran d'accueil, section pré-rendue sur les 36 pages SEO. QR généré localement, validé par un décodeur (81 cas).
+- Tests : `yarn test` (5 fichiers).
+
 # Lot 3 : SEO, multilingue (FR / EN / NL), signature multi-pages, performance
 
 - **Pages statiques par fonctionnalité et par langue** (36 pages : modifier, signer, fusionner, extraire, pivoter, réorganiser, ajouter texte / image, annoter, effacer, confidentialité), générées par `yarn build` (plugin `build/seoPlugin.js`) avec titres, descriptions, canonical, hreflang, Open Graph, JSON-LD, `sitemap.xml`, `robots.txt`. Voir `SEO.md`.

@@ -8,6 +8,9 @@ export default {
   // Exemple : 'https://pdf.mondomaine.com'   (variable : VITE_SITE_URL)
   siteUrl: 'https://free-apps.duckdns.org/pdf-editor',
 
+  // Dossier de déploiement ('/pdf-editor/'). Laisser vide : il est déduit de siteUrl ci-dessus (variable : VITE_BASE_URL).
+  baseUrl: '',
+
   // Lien de don PayPal (facultatif ; https obligatoire). Vide = aucun bouton de don affiché.
   // Exemples : 'https://paypal.me/monpseudo'  ou  'https://www.paypal.com/donate/?hosted_button_id=XXXX'   (variable : VITE_PAYPAL_URL)
   paypalUrl: '',

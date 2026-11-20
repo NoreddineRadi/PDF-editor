@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { injectSeo, renderSitemap, renderRobots, normalizeSiteUrl, normalizeHttpsUrl, pageTitle, esc } from "../build/seoRender.js";
+import { injectSeo, renderSitemap, renderRobots, normalizeSiteUrl, normalizeHttpsUrl, pageTitle, esc, renderManifest } from "../build/seoRender.js";
 import seoPlugin, { resolveSeoConfig } from "../build/seoPlugin.js";
-import { PAGES, LOCALES, pagePath } from "../src/seo/routes.js";
+import { PAGES, LOCALES, pagePath, normalizeBase, withBase, resolveRoute } from "../src/seo/routes.js";
 import fr from "../src/seo/content/fr.js";
 import en from "../src/seo/content/en.js";
 import nl from "../src/seo/content/nl.js";
@@ -134,6 +134,81 @@ test("plugin en dev : la route demandée détermine langue et page", () => {
   plugin.configResolved({ command: "serve" });
   const h = plugin.transformIndexHtml.handler(APP, { originalUrl: "/nl/pdf-samenvoegen/" });
   assert.ok(h.includes('<html lang="nl">') && h.includes("<h1>Pdf-bestanden gratis samenvoegen</h1>"));
+});
+
+// ---- Déploiement dans un sous-dossier : https://free-apps.duckdns.org/pdf-editor/
+const SUB = "https://free-apps.duckdns.org/pdf-editor";
+const subCfg = { ...cfg, siteUrl: SUB, baseUrl: "/pdf-editor/" };
+const subPage = (l, id) => injectSeo(APP, { content: CONTENT[l], id, locale: l, siteUrl: SUB, config: subCfg });
+
+test("sous-dossier : favicon, icône, manifest et liens internes portent /pdf-editor/", () => {
+  for (const l of LOCALES) for (const p of PAGES) {
+    const h = subPage(l, p.id);
+    assert.ok(h.includes('href="/pdf-editor/manifest.webmanifest"'), `${l}/${p.id} manifest`);
+    assert.ok(h.includes('href="/pdf-editor/favicon.svg"') && h.includes('href="/pdf-editor/apple-touch-icon.png"'));
+    // aucun lien racine "nu" : tout chemin absolu local commence par /pdf-editor/
+    for (const m of h.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
+      if (m[1].startsWith("/assets/")) continue; // injectés par Vite avec la base au build
+      assert.ok(m[1].startsWith("/pdf-editor/"), `${l}/${p.id} chemin racine ${m[1]}`);
+    }
+    assert.ok(h.includes(`<link rel="canonical" href="${SUB}${pagePath(l, p.id)}" />`));
+  }
+  const en = subPage("en", "sign");
+  assert.ok(en.includes('href="/pdf-editor/nl/pdf-ondertekenen/" hreflang="nl"'));
+  assert.ok(en.includes(`content="${SUB}/og-image.png"`));
+});
+
+test("manifest : start_url, scope et icônes incluent le préfixe", () => {
+  const m = JSON.parse(renderManifest("/pdf-editor/"));
+  assert.equal(m.start_url, "/pdf-editor/");
+  assert.equal(m.scope, "/pdf-editor/");
+  assert.ok(m.icons.length === 3 && m.icons.every((i) => i.src.startsWith("/pdf-editor/icon-")));
+  assert.equal(JSON.parse(renderManifest("")).start_url, "/");
+  assert.equal(JSON.parse(renderManifest("pdf-editor")).icons[0].src, "/pdf-editor/icon-192.png");
+});
+
+test("base : normalizeBase, withBase et resolveRoute avec préfixe", () => {
+  assert.equal(normalizeBase("/pdf-editor"), "/pdf-editor/");
+  assert.equal(normalizeBase(""), "/");
+  assert.equal(withBase("/pdf-editor/", "/en/"), "/pdf-editor/en/");
+  assert.equal(withBase("/", "/en/"), "/en/");
+  assert.deepEqual(resolveRoute("/pdf-editor/nl/pdf-samenvoegen/", "/pdf-editor/"), { locale: "nl", id: "merge" });
+  assert.deepEqual(resolveRoute("/pdf-editor/", "/pdf-editor/"), { locale: "fr", id: "home" });
+  // une page dont le slug ressemble au dossier ne doit pas être "mangée"
+  assert.deepEqual(resolveRoute("/pdf-editor/modifier-pdf/", "/pdf-editor/"), { locale: "fr", id: "edit" });
+});
+
+test("config : le dossier de déploiement est déduit de siteUrl si VITE_BASE_URL manque", () => {
+  assert.equal(resolveSeoConfig({ siteUrl: SUB }, {}).baseUrl, "/pdf-editor/");
+  assert.equal(resolveSeoConfig({ siteUrl: SUB }, { VITE_BASE_URL: "/autre/" }).baseUrl, "/autre/");
+  assert.equal(resolveSeoConfig({ siteUrl: "https://a.org" }, {}).baseUrl, "/");
+});
+
+test("plugin : dist/ contient le manifest préfixé et les pages dans les bons dossiers", () => {
+  const dir = mkdtempSync(join(tmpdir(), "seo-sub-"));
+  const plugin = seoPlugin(subCfg);
+  plugin.configResolved({ command: "build" });
+  plugin.transformIndexHtml.handler(APP, {});
+  plugin.writeBundle({ dir });
+  const m = JSON.parse(readFileSync(join(dir, "manifest.webmanifest"), "utf8"));
+  assert.equal(m.scope, "/pdf-editor/");
+  assert.ok(existsSync(join(dir, "en", "sign-pdf", "index.html")), "dist/en/... (le dossier /pdf-editor/ est celui du serveur)");
+  assert.ok(readFileSync(join(dir, "robots.txt"), "utf8").includes(`Sitemap: ${SUB}/sitemap.xml`));
+});
+
+test("don : section pré-rendue avec QR SVG et bouton, traduite, seulement si un lien est configuré", () => {
+  const url = "https://paypal.me/pseudo";
+  const on = { ...subCfg, paypalUrl: url };
+  for (const l of LOCALES) for (const p of PAGES) {
+    const h = injectSeo(APP, { content: CONTENT[l], id: p.id, locale: l, siteUrl: SUB, config: on });
+    assert.equal((h.match(/class="seo-donate"/g) || []).length, 1, `${l}/${p.id}`);
+    assert.ok(h.includes('<div class="seo-qr"><svg') && h.includes(`href="${url}" target="_blank" rel="noopener noreferrer nofollow"`));
+  }
+  const frH = injectSeo(APP, { content: CONTENT.fr, id: "home", locale: "fr", siteUrl: SUB, config: on });
+  const nlH = injectSeo(APP, { content: CONTENT.nl, id: "home", locale: "nl", siteUrl: SUB, config: on });
+  assert.ok(frH.includes("Faire un don via PayPal") && nlH.includes("Doneren via PayPal"));
+  assert.ok(!subPage("fr", "home").includes("seo-donate\""), "pas de lien configuré -> aucune section");
+  assert.ok(!/<section class="seo-donate"/.test(subPage("en", "sign")));
 });
 
 console.log(`\n${passed} tests OK`);

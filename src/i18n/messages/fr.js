@@ -115,4 +115,11 @@ export default {
   'err.imageFormat': 'Format non pris en charge (PNG, JPG, WebP ou GIF).',
   'err.imageTooBig': 'Image trop lourde (20 Mo maximum).',
   'err.imageEmpty': 'Image vide ou illisible.',
+
+  // Don facultatif
+  'don.title': 'Soutenir PDF Studio',
+  'don.text': 'PDF Studio est et restera 100 % gratuit, sans inscription ni abonnement. Si l’outil vous a été utile, vous pouvez offrir un café : c’est entièrement facultatif.',
+  'don.button': 'Faire un don via PayPal',
+  'don.scan': 'Scannez avec votre téléphone',
+  'don.qrAlt': 'QR code du lien de don PayPal',
 };

@@ -109,4 +109,11 @@ export default {
   'err.imageFormat': 'Unsupported format (PNG, JPG, WebP or GIF).',
   'err.imageTooBig': 'Image too large (20 MB maximum).',
   'err.imageEmpty': 'Image empty or unreadable.',
+
+  // Don facultatif
+  'don.title': 'Support PDF Studio',
+  'don.text': 'PDF Studio is and will stay 100% free, with no sign-up or subscription. If it helped you, you can buy me a coffee: it is entirely optional.',
+  'don.button': 'Donate with PayPal',
+  'don.scan': 'Scan with your phone',
+  'don.qrAlt': 'QR code for the PayPal donation link',
 };

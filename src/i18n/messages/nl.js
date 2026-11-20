@@ -109,4 +109,11 @@ export default {
   'err.imageFormat': 'Formaat niet ondersteund (PNG, JPG, WebP of GIF).',
   'err.imageTooBig': 'Afbeelding te groot (maximaal 20 MB).',
   'err.imageEmpty': 'Afbeelding leeg of onleesbaar.',
+
+  // Don facultatif
+  'don.title': 'PDF Studio steunen',
+  'don.text': 'PDF Studio is en blijft 100% gratis, zonder registratie of abonnement. Heeft het u geholpen, dan kunt u een koffie aanbieden: het is volledig vrijwillig.',
+  'don.button': 'Doneren via PayPal',
+  'don.scan': 'Scan met uw telefoon',
+  'don.qrAlt': 'QR-code van de PayPal-donatielink',
 };

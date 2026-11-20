@@ -13,6 +13,7 @@ import {
   DEFAULT_LOCALE,
   pagePath,
   resolveRoute,
+  normalizeBase,
 } from '../src/seo/routes.js';
 import {
   injectSeo,
@@ -20,6 +21,7 @@ import {
   renderRobots,
   normalizeSiteUrl,
   normalizeHttpsUrl,
+  renderManifest,
 } from './seoRender.js';
 import fr from '../src/seo/content/fr.js';
 import en from '../src/seo/content/en.js';
@@ -30,8 +32,18 @@ const CONTENT = { fr, en, nl };
 export function resolveSeoConfig(fileConfig = {}, env = {}) {
   const pick = (envKey, key) =>
     (env[envKey] ?? fileConfig[key] ?? '').toString().trim();
+  const siteUrl = normalizeSiteUrl(pick('VITE_SITE_URL', 'siteUrl'));
+  // Dossier de déploiement : VITE_BASE_URL > site.config.js (baseUrl) > chemin de siteUrl > racine.
+  // Dériver de siteUrl évite un build "sans préfixe" si la variable d'environnement manque en CI.
+  let sitePath = '';
+  try {
+    sitePath = siteUrl ? new URL(siteUrl).pathname : '';
+  } catch {
+    sitePath = '';
+  }
   return {
-    siteUrl: normalizeSiteUrl(pick('VITE_SITE_URL', 'siteUrl')),
+    siteUrl,
+    baseUrl: normalizeBase(pick('VITE_BASE_URL', 'baseUrl') || sitePath),
     paypalUrl: normalizeHttpsUrl(pick('VITE_PAYPAL_URL', 'paypalUrl')),
     googleSiteVerification: pick(
       'VITE_GOOGLE_SITE_VERIFICATION',
@@ -41,7 +53,6 @@ export function resolveSeoConfig(fileConfig = {}, env = {}) {
       'VITE_BING_SITE_VERIFICATION',
       'bingSiteVerification',
     ),
-    baseUrl: pick('VITE_BASE_URL', 'baseUrl'),
   };
 }
 
@@ -73,6 +84,15 @@ export default function seoPlugin(config) {
         return render(html, route.locale, route.id);
       },
     },
+    // Dev : sert le manifest à {base}manifest.webmanifest (en build il est écrit dans dist/)
+    configureServer(server) {
+      const url = `${normalizeBase(config.baseUrl)}manifest.webmanifest`;
+      server.middlewares.use((req, res, next) => {
+        if ((req.url || '').split('?')[0] !== url) return next();
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.end(renderManifest(config.baseUrl));
+      });
+    },
     writeBundle(options) {
       if (!isBuild || !baseHtml) return;
       const outDir = options.dir || 'dist';
@@ -89,6 +109,7 @@ export default function seoPlugin(config) {
           count++;
         }
       }
+      writeFileSync(join(outDir, 'manifest.webmanifest'), renderManifest(config.baseUrl));
       writeFileSync(join(outDir, 'robots.txt'), renderRobots(config.siteUrl));
       if (config.siteUrl) {
         writeFileSync(

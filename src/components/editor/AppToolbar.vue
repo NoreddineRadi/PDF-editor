@@ -347,15 +347,7 @@
 
     <!-- 3. BLOC DROITE : Actions d'Exportation -->
     <div class="header-right">
-      <a
-        v-if="donateUrl"
-        class="donate-link"
-        :href="donateUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        v-tooltip.bottom="$t('tb.donateTip')"
-        >♥ <span class="btn-label">{{ $t('tb.donate') }}</span></a
-      >
+      <DonateMenu v-if="donateUrl" />
 
       <select
         class="lang-select"
@@ -408,6 +400,7 @@ import { usePdfStore } from '@/stores/pdfStore';
 import { defineAsyncComponent } from 'vue';
 import ToolIcon from './ToolIcon.vue';
 import ToolMenu from './ToolMenu.vue';
+import DonateMenu from './DonateMenu.vue';
 import Button from 'primevue/button';
 import { appInfo, describeBuild } from '@/utils/appInfo';
 import { locale, LOCALES, t, switchLocaleUrl } from '@/i18n';
@@ -1004,22 +997,5 @@ export default {
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-}
-.donate-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  color: #f9a8d4;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.donate-link:hover {
-  background: #1e293b;
 }
 </style>

@@ -2,7 +2,13 @@
  * Rendu SEO des pages statiques (fonctions PURES : testables sous Node, sans Vite).
  * Chaque page = le HTML de l'application (même JS/CSS) + balises <head> propres à la page + contenu éditorial pré-rendu.
  */
-import { PAGES, LOCALES, DEFAULT_LOCALE, OG_LOCALE, LOCALE_NAMES, pagePath } from '../src/seo/routes.js';
+import { encodeQr, qrToSvg } from '../src/utils/qrcode.js';
+import frMsg from '../src/i18n/messages/fr.js';
+import enMsg from '../src/i18n/messages/en.js';
+import nlMsg from '../src/i18n/messages/nl.js';
+import { PAGES, LOCALES, DEFAULT_LOCALE, OG_LOCALE, LOCALE_NAMES, pagePath, normalizeBase, withBase } from '../src/seo/routes.js';
+
+const MESSAGES = { fr: frMsg, en: enMsg, nl: nlMsg };
 
 export const esc = (s) =>
   String(s ?? '')
@@ -58,13 +64,22 @@ const SEO_CSS = `
 .seo-cta{display:inline-block;background:#2563eb;color:#fff!important;text-decoration:none;font-weight:600;border-radius:8px;padding:.6rem 1.2rem;margin:.8rem 0}
 .seo-tools{columns:2;column-gap:2rem;list-style:none;padding:0}
 .seo-lang a{margin-right:.9rem}
+.seo-donate{display:flex;align-items:center;gap:1.4rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.1rem 1.3rem;margin:2.2rem 0 0}
+.seo-donate h2{margin:0 0 .3rem;font-size:1.15rem}
+.seo-donate p{margin:.3rem 0}
+.seo-qr svg{display:block;width:128px;height:128px;border:1px solid #e2e8f0;border-radius:8px}
+.seo-donate .seo-cta{margin:.4rem 0 .2rem;background:#0070ba}
+.seo-scan{font-size:.8rem;color:#64748b}
+@media (max-width:640px),(pointer:coarse){.seo-qr,.seo-scan{display:none}.seo-donate{display:block}}
 .seo-foot{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid #e2e8f0;color:#475569;font-size:.9rem}
 @media (max-width:600px){.seo-tools{columns:1}.seo h1{font-size:1.6rem}}
 `.replace(/\n/g, '');
 
 function metaFor({ content, id, locale, siteUrl, config }) {
   const page = content.pages[id];
-  const abs = (path) => (siteUrl ? siteUrl + path : path);
+  const base = normalizeBase(config.baseUrl);
+  // siteUrl contient déjà le dossier de déploiement (https://hote/pdf-editor) ; sans siteUrl : chemins relatifs à la racine + base
+  const abs = (path) => (siteUrl ? siteUrl + path : withBase(base, path));
   const url = abs(pagePath(locale, id));
   const title = pageTitle(content, id);
   const image = abs('/og-image.png');
@@ -95,9 +110,9 @@ function metaFor({ content, id, locale, siteUrl, config }) {
     `<meta name="twitter:title" content="${esc(title)}" />`,
     `<meta name="twitter:description" content="${esc(page.description)}" />`,
     `<meta name="twitter:image" content="${esc(image)}" />`,
-    `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`,
-    `<link rel="apple-touch-icon" href="/apple-touch-icon.png" />`,
-    `<link rel="manifest" href="/manifest.webmanifest" />`,
+    `<link rel="icon" type="image/svg+xml" href="${withBase(base, '/favicon.svg')}" />`,
+    `<link rel="apple-touch-icon" href="${withBase(base, '/apple-touch-icon.png')}" />`,
+    `<link rel="manifest" href="${withBase(base, '/manifest.webmanifest')}" />`,
   ];
   if (config.googleSiteVerification) tags.push(`<meta name="google-site-verification" content="${esc(config.googleSiteVerification)}" />`);
   if (config.bingSiteVerification) tags.push(`<meta name="msvalidate.01" content="${esc(config.bingSiteVerification)}" />`);
@@ -141,26 +156,44 @@ function metaFor({ content, id, locale, siteUrl, config }) {
   return { title, tags: tags.join('\n    ') };
 }
 
+/**
+ * Bloc de don facultatif : QR code (ordinateur) + bouton (mobile). Chaîne vide si aucun lien n'est configuré.
+ * Le QR est un SVG généré au build : il fonctionne sans JavaScript.
+ */
+export function renderDonate(url, msg) {
+  if (!url) return '';
+  let qr = '';
+  try {
+    qr = qrToSvg(encodeQr(url), { label: msg['don.qrAlt'] });
+  } catch {
+    qr = ''; // lien trop long pour un QR : le bouton reste là
+  }
+  return `<section class="seo-donate" aria-label="${esc(msg['don.title'])}">
+${qr ? `<div class="seo-qr">${qr}</div>` : ''}
+<div><h2>♥ ${esc(msg['don.title'])}</h2><p>${esc(msg['don.text'])}</p><p><a class="seo-cta" href="${esc(url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(msg['don.button'])}</a></p>${qr ? `<p class="seo-scan">${esc(msg['don.scan'])}</p>` : ''}</div>
+</section>`;
+}
+
 function bodyFor({ content, id, locale, config }) {
   const page = content.pages[id];
+  const base = normalizeBase(config.baseUrl);
+  const L = (loc, pid) => withBase(base, pagePath(loc, pid)); // lien interne, dossier de déploiement compris
   const ui = content.ui;
   const li = (items) => items.map((x) => `<li>${esc(x)}</li>`).join('');
 
   const crumbs =
     id === 'home'
       ? ''
-      : `<nav class="seo-crumbs" aria-label="breadcrumb"><a href="${pagePath(locale, 'home')}">${esc(ui.breadcrumbHome)}</a> › ${esc(page.navLabel)}</nav>`;
+      : `<nav class="seo-crumbs" aria-label="breadcrumb"><a href="${L(locale, 'home')}">${esc(ui.breadcrumbHome)}</a> › ${esc(page.navLabel)}</nav>`;
 
   const steps = page.steps.length ? `<h2>${esc(ui.howTo)}</h2><ol>${li(page.steps)}</ol>` : '';
   const pointsTitle = id === 'privacy' ? page.navLabel : ui.why;
   const faq = page.faq.map(([q, a]) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join('');
   const tools = PAGES.filter((p) => p.id !== id && p.id !== 'privacy' && p.id !== 'home')
-    .map((p) => `<li><a href="${pagePath(locale, p.id)}">${esc(content.pages[p.id].navLabel)}</a></li>`)
+    .map((p) => `<li><a href="${L(locale, p.id)}">${esc(content.pages[p.id].navLabel)}</a></li>`)
     .join('');
-  const langs = LOCALES.map((l) => `<a href="${pagePath(l, id)}" hreflang="${l}" lang="${l}"${l === locale ? ' aria-current="true"' : ''}>${esc(LOCALE_NAMES[l])}</a>`).join('');
-  const donate = config.paypalUrl
-    ? `<p><a href="${esc(config.paypalUrl)}" target="_blank" rel="noopener noreferrer nofollow">${esc(ui.donate)}</a> · ${esc(ui.donateNote)}</p>`
-    : '';
+  const langs = LOCALES.map((l) => `<a href="${L(l, id)}" hreflang="${l}" lang="${l}"${l === locale ? ' aria-current="true"' : ''}>${esc(LOCALE_NAMES[l])}</a>`).join('');
+  const donate = renderDonate(config.paypalUrl, MESSAGES[locale]);
 
   return `<noscript><p style="padding:16px;font:16px sans-serif">${esc(ui.noscript)}</p></noscript>
 <main class="seo" id="seo-content">
@@ -173,8 +206,9 @@ ${crumbs}
 ${steps}
 <h2>${esc(pointsTitle)}</h2><ul>${li(page.points)}</ul>
 <h2>${esc(ui.faq)}</h2>${faq}
-<h2>${esc(ui.tools)}</h2><ul class="seo-tools"><li><a href="${pagePath(locale, 'home')}">${esc(content.pages.home.navLabel)}</a></li>${tools}</ul>
-<footer class="seo-foot"><p class="seo-lang"><strong>${esc(ui.language)} :</strong> ${langs}</p><p>${esc(ui.footer)}</p><p><a href="${pagePath(locale, 'privacy')}">${esc(ui.privacyLink)}</a></p>${donate}</footer>
+<h2>${esc(ui.tools)}</h2><ul class="seo-tools"><li><a href="${L(locale, 'home')}">${esc(content.pages.home.navLabel)}</a></li>${tools}</ul>
+${donate}
+<footer class="seo-foot"><p class="seo-lang"><strong>${esc(ui.language)} :</strong> ${langs}</p><p>${esc(ui.footer)}</p><p><a href="${L(locale, 'privacy')}">${esc(ui.privacyLink)}</a></p></footer>
 </div>
 </main>`;
 }
@@ -217,4 +251,29 @@ export function renderRobots(siteUrl) {
   const lines = ['User-agent: *', 'Allow: /', ''];
   if (siteUrl) lines.push(`Sitemap: ${siteUrl}/sitemap.xml`, '');
   return lines.join('\n');
+}
+
+/**
+ * Manifest PWA. Les chemins incluent le dossier de déploiement (ex. /pdf-editor/) : start_url, scope et icônes.
+ * Fonction pure, utilisée au build ET par le serveur de dev.
+ */
+export function renderManifest(baseUrl) {
+  const base = normalizeBase(baseUrl);
+  const icon = (file, extra = {}) => ({ src: withBase(base, `/${file}`), sizes: file.includes('512') ? '512x512' : '192x192', type: 'image/png', ...extra });
+  return JSON.stringify(
+    {
+      name: 'PDF Studio',
+      short_name: 'PDF Studio',
+      description: 'Free online PDF editor: edit, sign, merge, extract, rotate and annotate PDFs. No sign-up.',
+      id: base,
+      start_url: base,
+      scope: base,
+      display: 'standalone',
+      background_color: '#0f172a',
+      theme_color: '#0f172a',
+      icons: [icon('icon-192.png'), icon('icon-512.png'), icon('icon-512.png', { purpose: 'maskable' })],
+    },
+    null,
+    2,
+  ) + '\n';
 }
